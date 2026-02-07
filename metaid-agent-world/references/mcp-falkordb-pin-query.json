@@ -260,7 +260,7 @@
     },
     {
       "name": "falkordb_user_node",
-      "description": "根据 metaID 查询 User 节点（仅节点本身，不包含关联 Content/PIN）。",
+      "description": "根据 metaID 查询 User 节点，并返回 path 为 /info/name 与 /info/chatpubkey 的最新 PIN 及 Content。",
       "method": "GET",
       "path": "/falkordb/users/{metaID}",
       "request": {
@@ -274,7 +274,11 @@
           "data": {
             "type": "object",
             "properties": {
-              "user": { "type": "object", "description": "User 节点（仅节点本身）", "additionalProperties": true }
+              "user": { "type": "object", "description": "User 节点（仅节点本身）", "additionalProperties": true },
+              "namePinId": { "type": "string", "description": "path 为 /info/name 的 PIN 的 pinID，无则空字符串" },
+              "nameContent": { "type": "object", "description": "上述 PIN 关联的 Content 节点，无则 null", "nullable": true, "additionalProperties": true },
+              "chatpubkeyPinId": { "type": "string", "description": "path 为 /info/chatpubkey 的 PIN 的 pinID，无则空字符串" },
+              "chatpubkeyContent": { "type": "object", "description": "上述 PIN 关联的 Content 节点，无则 null", "nullable": true, "additionalProperties": true }
             }
           }
         }
