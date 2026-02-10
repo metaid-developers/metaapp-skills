@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import * as path from 'path'
-import { generateMnemonic, getAllAddress, getPublicKey, getPath, getUtxos, getCredential } from './wallet'
+import { generateMnemonic, getAllAddress, getPublicKey, getPath, getUtxos, getCredential, DEFAULT_PATH, parseAddressIndexFromPath, buildPathFromIndex } from './wallet'
 import { getMVCRewards, getMVCInitRewards, sleep, getUserInfoByAddressByMs } from './api'
 import { createPin, CreatePinParams } from './metaid'
 import { createBuzz } from './buzz'
@@ -13,8 +13,11 @@ import {
   logError,
   extractUsername,
   extractBuzzContent,
+  extractWalletPathFromPrompt,
   shouldCreateWallet,
-  Account
+  extractProfileFromPrompt,
+  applyProfileToAccount,
+  Account,
 } from './utils'
 
 async function main() {
@@ -33,12 +36,30 @@ async function main() {
     let currentAccount: Account | null = null
 
     if (needCreateWallet || accountData.accountList.length === 0) {
-      // Create new wallet
+      // Create new wallet（可从 userPrompt 指定 path / index，未指定则使用默认）
       console.log('🔐 Creating new wallet...')
       const mnemonic = await generateMnemonic()
-      const addresses = await getAllAddress(mnemonic)
-      const publicKey = await getPublicKey('mvc', mnemonic)
-      const path = getPath()
+      const walletPathConfig = extractWalletPathFromPrompt(userPrompt)
+
+      let path: string
+      let newWalletAddressIndex: number
+
+      if (walletPathConfig?.path) {
+        // 用户显式给出完整 path
+        path = walletPathConfig.path
+        newWalletAddressIndex = parseAddressIndexFromPath(path)
+      } else if (walletPathConfig?.index != null) {
+        // 用户只给出索引：例如「路径1」-> m/44'/10001'/0'/0/1
+        newWalletAddressIndex = walletPathConfig.index
+        path = buildPathFromIndex(newWalletAddressIndex)
+      } else {
+        // 未指定时回退默认 path（account.json 无 account 时也会用 DEFAULT_PATH）
+        path = getPath({ defaultPath: DEFAULT_PATH })
+        newWalletAddressIndex = parseAddressIndexFromPath(path)
+      }
+
+      const addresses = await getAllAddress(mnemonic, { addressIndex: newWalletAddressIndex })
+      const publicKey = await getPublicKey('mvc', mnemonic, { addressIndex: newWalletAddressIndex })
 
       const newAccount: Account = {
         mnemonic,
@@ -86,7 +107,9 @@ async function main() {
       console.log('📝 Registering MetaID account...')
       
       // Check if user has UTXOs
-      const utxos = await getUtxos('mvc', currentAccount.mnemonic)
+      const utxos = await getUtxos('mvc', currentAccount.mnemonic, {
+        addressIndex: parseAddressIndexFromPath(currentAccount.path),
+      })
       
       if (utxos.length === 0) {
         // New user, claim gas subsidy
@@ -103,7 +126,8 @@ async function main() {
         const sigRes = await getCredential({
           mnemonic: currentAccount.mnemonic,
           chain: 'btc',
-          message: 'metaso.network'
+          message: 'metaso.network',
+          addressIndex: parseAddressIndexFromPath(currentAccount.path),
         })
         
         // Call getMVCInitRewards
@@ -135,7 +159,9 @@ async function main() {
         feeRate: 1,
       }
 
-      const namePinRes = await createPin(namePinParams, currentAccount.mnemonic)
+      const namePinRes = await createPin(namePinParams, currentAccount.mnemonic, {
+        addressIndex: parseAddressIndexFromPath(currentAccount.path),
+      })
       
       if (namePinRes.txids && namePinRes.txids.length > 0) {
         console.log('✅ MetaID node created successfully')
@@ -154,6 +180,8 @@ async function main() {
             if (accountIndex >= 0) {
               accountData.accountList[accountIndex].userName = username
               accountData.accountList[accountIndex].globalMetaId = userInfo.globalMetaId
+              const profileFromPrompt = extractProfileFromPrompt(userPrompt)
+              applyProfileToAccount(accountData.accountList[accountIndex], profileFromPrompt)
               writeAccountFile(accountData)
               currentAccount.userName = username
               currentAccount.globalMetaId = userInfo.globalMetaId
@@ -165,6 +193,8 @@ async function main() {
             )
             if (accountIndex >= 0) {
               accountData.accountList[accountIndex].userName = username
+              const profileFromPrompt = extractProfileFromPrompt(userPrompt)
+              applyProfileToAccount(accountData.accountList[accountIndex], profileFromPrompt)
               writeAccountFile(accountData)
               currentAccount.userName = username
             }
@@ -178,6 +208,8 @@ async function main() {
           )
           if (accountIndex >= 0) {
             accountData.accountList[accountIndex].userName = username
+            const profileFromPrompt = extractProfileFromPrompt(userPrompt)
+            applyProfileToAccount(accountData.accountList[accountIndex], profileFromPrompt)
             writeAccountFile(accountData)
             currentAccount.userName = username
           }
@@ -192,7 +224,9 @@ async function main() {
     // Step 4: Send Buzz message if content is provided
     if (buzzContent) {
       console.log(`📢 Sending Buzz message: ${buzzContent}`)
-      const buzzResult = await createBuzz(currentAccount.mnemonic, buzzContent, 1)
+      const buzzResult = await createBuzz(currentAccount.mnemonic, buzzContent, 1, {
+        addressIndex: parseAddressIndexFromPath(currentAccount.path),
+      })
       
       if (buzzResult.txids && buzzResult.txids.length > 0) {
         console.log(`✅ Buzz sent successfully!`)

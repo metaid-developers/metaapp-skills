@@ -181,6 +181,8 @@ async function fetchUtxos(chain: string, address: string): Promise<any[]> {
   }
 }
 
+export type WalletOptions = { addressIndex?: number }
+
 export const payTransactions = async (
   mnemonic: string,
   toPayTransactions: {
@@ -188,13 +190,14 @@ export const payTransactions = async (
     message?: string
   }[],
   hasMetaid: boolean = false,
-  feeb?: number
+  feeb?: number,
+  options?: WalletOptions
 ) => {
   if (!mnemonic) {
     throw new Error(`mnemonic is null`)
   }
-    const network = mvc.Networks.livenet
-  const wallet = await getCurrentWallet(Chain.MVC, { mnemonic })
+  const network = mvc.Networks.livenet
+  const wallet = await getCurrentWallet(Chain.MVC, { mnemonic, addressIndex: options?.addressIndex })
   const address = wallet.getAddress()
   if (!feeb) {
     feeb = 1
@@ -354,12 +357,16 @@ export const payTransactions = async (
   return payedTransactions
 }
 
-async function createPinMvc(params: CreatePinParams, mnemonic: string): Promise<CreatePinResult> {
+async function createPinMvc(
+  params: CreatePinParams,
+  mnemonic: string,
+  options?: WalletOptions
+): Promise<CreatePinResult> {
   if (!mnemonic) {
     throw new Error(`mnemonic is null`)
   }
 
-  const wallet = await getCurrentWallet(Chain.MVC, { mnemonic })
+  const wallet = await getCurrentWallet(Chain.MVC, { mnemonic, addressIndex: options?.addressIndex })
   const network = mvc.Networks.livenet
   const address = wallet.getAddress()
   
@@ -408,7 +415,7 @@ async function createPinMvc(params: CreatePinParams, mnemonic: string): Promise<
   }
   
   if (params.noBroadcast) {
-    const payedTxs = await payTransactions(mnemonic, toPayTransactions, true, params.feeRate)
+    const payedTxs = await payTransactions(mnemonic, toPayTransactions, true, params.feeRate, options)
     
     let totalCost = 0
     for (const txStr of payedTxs) {
@@ -432,24 +439,30 @@ async function createPinMvc(params: CreatePinParams, mnemonic: string): Promise<
     }
   }
   
-  const payedTransactions = await payTransactions(mnemonic, toPayTransactions, true, params.feeRate)
-  
+  const payedTransactions = await payTransactions(
+    mnemonic,
+    toPayTransactions,
+    true,
+    params.feeRate,
+    options
+  )
+
   let totalCost = 0
   for (const txStr of payedTransactions) {
     const tx = TxComposer.deserialize(txStr)
     const mvcTx = tx.tx
-    
+
     const inputTotal = mvcTx.inputs.reduce((sum, input) => {
       return sum + (input.output?.satoshis || 0)
     }, 0)
-    
+
     const outputTotal = mvcTx.outputs.reduce((sum, output) => {
       return sum + output.satoshis
     }, 0)
-    
+
     totalCost += (inputTotal - outputTotal)
   }
-  
+
   const broadcastedTxids: string[] = []
   for (const txStr of payedTransactions) {
     const tx = TxComposer.deserialize(txStr)
@@ -463,18 +476,22 @@ async function createPinMvc(params: CreatePinParams, mnemonic: string): Promise<
   }
 }
 
-export async function createPin(params: CreatePinParams, mnemonic: string): Promise<CreatePinResult> {
+export async function createPin(
+  params: CreatePinParams,
+  mnemonic: string,
+  options?: WalletOptions
+): Promise<CreatePinResult> {
   if (!mnemonic) {
     throw new Error(`mnemonic is null`)
   }
-  
+
   switch (params.chain) {
     case 'btc':
       throw new Error('BTC chain not yet supported')
     case 'doge':
-      return await createPinDoge(params, mnemonic)
+      return await createPinDoge(params, mnemonic, options)
     case 'mvc':
-      return await createPinMvc(params, mnemonic)
+      return await createPinMvc(params, mnemonic, options)
     default:
       throw new Error(`Unsupported chain: ${params.chain}`)
   }
@@ -483,12 +500,19 @@ export async function createPin(params: CreatePinParams, mnemonic: string): Prom
 /**
  * 创建 PIN (DOGE)
  */
-async function createPinDoge(params: CreatePinParams, mnemonic: string): Promise<CreatePinResult> {
+async function createPinDoge(
+  params: CreatePinParams,
+  mnemonic: string,
+  options?: WalletOptions
+): Promise<CreatePinResult> {
   if (!mnemonic) {
     throw new Error(`mnemonic is null`)
   }
 
-  const wallet = await getDogeWallet({ mnemonic: mnemonic })
+  const wallet = await getDogeWallet({
+    mnemonic,
+    addressIndex: options?.addressIndex,
+  })
   const walletAddress = wallet.getAddress()
   let feeRate: number
   

@@ -34,11 +34,12 @@ await getMVCRewards({
 // Wait for subsidy to be processed
 await sleep(5000) // 5 seconds
 
-// Step 2: Get credential for signing
+// Step 2: Get credential for signing（若有 account，可传 addressIndex: parseAddressIndexFromPath(account.path)）
 const sigRes = await getCredential({
   mnemonic: mnemonic,
   chain: 'btc',
-  message: 'metaso.network'
+  message: 'metaso.network',
+  addressIndex: 0, // 可选，不传默认 0
 })
 
 // Step 3: Claim init rewards with signature
@@ -73,7 +74,8 @@ const params: CreatePinParams = {
   feeRate: 1,
 }
 
-const result = await createPin(params, mnemonic)
+const result = await createPin(params, mnemonic, { addressIndex: 0 })
+// 第三个参数可选：{ addressIndex?: number }，不传则使用 0。若有 account，传 { addressIndex: parseAddressIndexFromPath(account.path) }
 // Returns: { txids: string[], totalCost: number }
 ```
 

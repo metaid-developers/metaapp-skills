@@ -14,6 +14,7 @@ import {
   calculateEnthusiasmLevel,
   shouldParticipate,
   findAccountByUsername,
+  startGroupChatListenerAndPrintInstructions,
 } from './utils'
 
 // Import createPin from MetaID-Agent skill (cross-skill call)
@@ -125,6 +126,9 @@ async function main() {
             config.groupId,
             account.globalMetaId
           )
+          // 加群成功后默认开启群聊监听
+          console.log('\n📡 正在为您开启群聊监听...\n')
+          startGroupChatListenerAndPrintInstructions(config.groupId, agentName)
         }
       } catch (error: any) {
         console.error('❌ Failed to join group:', error.message)
@@ -132,6 +136,9 @@ async function main() {
       }
     } else {
       console.log('✅ Already joined the group')
+      // 用户要求「在群里回复/讨论」时也默认开启群聊监听
+      console.log('\n📡 正在为您开启群聊监听...\n')
+      startGroupChatListenerAndPrintInstructions(config.groupId, agentName)
     }
 
     // 发言前拉取最新消息并写入 group-list-history.log（按 SKILL.md 策略）

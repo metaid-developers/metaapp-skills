@@ -5,6 +5,7 @@ import { networks } from 'bitcoinjs-lib'
 import ECPairFactory from 'ecpair'
 import * as ecc from '@bitcoinerlab/secp256k1'
 import CryptoJS from 'crypto-js'
+import { readAccountFile } from './utils'
 
 // Re-export Chain for use in other modules
 export { Chain }
@@ -27,10 +28,29 @@ export async function getV3AddressType(chain: SupportedChain): Promise<AddressTy
   return AddressType.SameAsMvc
 }
 
+/** 新建 agent 时的默认 path，与 getPath 无 account 时的回退值一致 */
+export const DEFAULT_PATH = `m/44'/10001'/0'/0/0`
+
+/** 从 BIP44 path（如 m/44'/10001'/0'/0/0）解析出 addressIndex，解析失败返回 0 */
+export function parseAddressIndexFromPath(path: string): number {
+  if (!path || typeof path !== 'string') return 0
+  const m = path.match(/\/0\/(\d+)$/)
+  return m ? parseInt(m[1], 10) : 0
+}
+
+/** 根据索引构造标准 MVC 派生路径：index=1 -> m/44'/10001'/0'/0/1 */
+export function buildPathFromIndex(index: number): string {
+  const safeIndex = Number.isFinite(index) && index >= 0 ? Math.floor(index) : 0
+  const base = DEFAULT_PATH.replace(/\/\d+$/, '/')
+  return `${base}${safeIndex}`
+}
+
 export async function getCurrentWallet<T extends SupportedChain>(
   chain: T,
   options?: {
     mnemonic?: string
+    /** 不传则使用 0 */
+    addressIndex?: number
   }
 ): Promise<T extends Chain.BTC ? BtcWallet : T extends Chain.DOGE ? DogeWallet : MvcWallet> {
   const network = getNet() as Net
@@ -38,7 +58,7 @@ export async function getCurrentWallet<T extends SupportedChain>(
   if (!mnemonic) {
     throw new Error(`mnemonic is null`)
   }
-  const addressIndex = 0
+  const addressIndex = options?.addressIndex ?? 0
   const addressType = await getV3AddressType(chain)
   const chainStr = String(chain)
   if (chainStr === 'btc' || chainStr === Chain.BTC) {
@@ -94,21 +114,28 @@ export async function generateMnemonic(): Promise<string> {
 }
 
 // Get address for a specific chain
-export async function getAddress(chain: SupportedChain = 'mvc', mnemonic: string): Promise<string> {
+export async function getAddress(
+  chain: SupportedChain = 'mvc',
+  mnemonic: string,
+  options?: { addressIndex?: number }
+): Promise<string> {
   if (!mnemonic) {
     throw new Error(`mnemonic is null`)
   }
 
   if (chain === 'doge') {
-    const wallet = await getDogeWallet({ mnemonic: mnemonic })
+    const wallet = await getDogeWallet({ mnemonic, addressIndex: options?.addressIndex })
     return wallet.getAddress()
   }
-  const wallet = await getCurrentWallet(chain as CoreChain, { mnemonic })
+  const wallet = await getCurrentWallet(chain as CoreChain, { mnemonic, addressIndex: options?.addressIndex })
   return wallet.getAddress()
 }
 
 // Get all addresses (MVC, BTC, DOGE)
-export async function getAllAddress(mnemonic: string): Promise<{
+export async function getAllAddress(
+  mnemonic: string,
+  options?: { addressIndex?: number }
+): Promise<{
   mvcAddress: string
   btcAddress: string
   dogeAddress: string
@@ -117,8 +144,9 @@ export async function getAllAddress(mnemonic: string): Promise<{
     throw new Error(`mnemonic is null`)
   }
 
-  const dogeWallet = await getDogeWallet({ mnemonic: mnemonic })
-  const wallet = await getCurrentWallet(Chain.MVC, { mnemonic })
+  const addressIndex = options?.addressIndex
+  const dogeWallet = await getDogeWallet({ mnemonic, addressIndex })
+  const wallet = await getCurrentWallet(Chain.MVC, { mnemonic, addressIndex })
   return {
     mvcAddress: wallet.getAddress(),
     btcAddress: wallet.getAddress(),
@@ -127,14 +155,16 @@ export async function getAllAddress(mnemonic: string): Promise<{
 }
 
 // Get public key for MVC
-export async function getPublicKey(chain: CoreChain = 'mvc', mnemonic: string): Promise<string> {
+export async function getPublicKey(
+  chain: CoreChain = 'mvc',
+  mnemonic: string,
+  options?: { addressIndex?: number }
+): Promise<string> {
   if (!mnemonic) {
     throw new Error(`mnemonic is null`)
   }
-  
-  // Note: This requires mvc library which should be imported
-  // For now, using a placeholder - actual implementation depends on mvc library
-  const wallet = await getCurrentWallet(chain, { mnemonic })
+
+  const wallet = await getCurrentWallet(chain, { mnemonic, addressIndex: options?.addressIndex })
   return wallet.getPublicKey().toString('hex')
 }
 
@@ -142,8 +172,20 @@ export function getNet(): Net {
   return 'livenet' as Net
 }
 
-export function getPath(): string {
-  return `m/44'/10001'/0'/0/0`
+/** 从 account.json 要操作的 accountList 项获取 path；新建 agent 时可通过 defaultPath 指定默认路径 */
+export function getPath(options?: { accountIndex?: number; defaultPath?: string }): string {
+  if (options?.defaultPath != null) {
+    return options.defaultPath
+  }
+  try {
+    const data = readAccountFile()
+    const index = options?.accountIndex ?? 0
+    const item = data.accountList[index]
+    if (item?.path) return item.path
+  } catch {
+    /* ignore */
+  }
+  return DEFAULT_PATH
 }
 
 export function getMvcRootPath(): string {
@@ -161,19 +203,21 @@ export async function getCredential({
   chain = 'btc' as CoreChain,
   message = 'metalet.space',
   encoding = 'base64' as BufferEncoding,
+  addressIndex,
 }: {
   mnemonic: string
   chain?: CoreChain
   message?: string
   encoding?: BufferEncoding
+  /** 不传则使用 0，可与 account.path 经 parseAddressIndexFromPath 得到 */
+  addressIndex?: number
 }): Promise<{ address: string; publicKey: string; signature: string }> {
   if (!mnemonic) {
     throw new Error(`mnemonic is null`)
   }
-  
-  let signature = ''
-  const wallet = await getCurrentWallet(chain, { mnemonic })
-  signature = wallet.signMessage(message, encoding)
+
+  const wallet = await getCurrentWallet(chain, { mnemonic, addressIndex })
+  const signature = wallet.signMessage(message, encoding)
 
   return {
     signature,
@@ -183,11 +227,15 @@ export async function getCredential({
 }
 
 // Get UTXOs for a chain
-export async function getUtxos(chain: SupportedChain = 'mvc', mnemonic: string) {
+export async function getUtxos(
+  chain: SupportedChain = 'mvc',
+  mnemonic: string,
+  options?: { addressIndex?: number }
+) {
   if (!mnemonic) {
     throw new Error(`mnemonic is null`)
   }
-  const address = await getAddress(chain, mnemonic)
+  const address = await getAddress(chain, mnemonic, options)
   if (chain === 'mvc') {
     const { fetchMVCUtxos } = await import('./api')
     return await fetchMVCUtxos(address)

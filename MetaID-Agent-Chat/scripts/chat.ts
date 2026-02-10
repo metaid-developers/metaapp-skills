@@ -62,6 +62,15 @@ export enum MessageType {
   cardMsg = 8,
 }
 
+/** idchat.io API 需要浏览器头，否则可能返回 fetch failed */
+const CHAT_API_HEADERS: Record<string, string> = {
+  Accept: 'application/json, text/plain, */*',
+  Origin: 'https://www.idchat.io',
+  Referer: 'https://www.idchat.io/',
+  'User-Agent':
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36',
+}
+
 // Create lazy-initialized API client
 const ChatApi = createLazyApiClient(
   () => {
@@ -122,7 +131,7 @@ export const getChannelNewestMessages = async ({
       lastIndex: number
       list: ChatMessageItem[] | null
     }
-  } = await ChatApi.get(`/group-chat/group-chat-list-by-index?${query}`)
+  } = await ChatApi.get(`/group-chat/group-chat-list-by-index?${query}`, CHAT_API_HEADERS)
   
   return data.data
 }

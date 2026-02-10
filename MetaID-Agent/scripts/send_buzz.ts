@@ -10,6 +10,7 @@
 import * as fs from 'fs'
 import * as path from 'path'
 import { createBuzz } from './buzz'
+import { parseAddressIndexFromPath } from './wallet'
 import { readAccountFile, findAccountByKeyword } from './utils'
 
 async function main() {
@@ -53,7 +54,9 @@ async function main() {
   console.log(`   内容长度: ${content.length} 字符`)
 
   try {
-    const result = await createBuzz(account.mnemonic, content, 1)
+    const result = await createBuzz(account.mnemonic, content, 1, {
+      addressIndex: parseAddressIndexFromPath(account.path),
+    })
     if (result.txids?.length) {
       console.log(`✅ Buzz 发送成功!`)
       console.log(`   TXID: ${result.txids[0]}`)

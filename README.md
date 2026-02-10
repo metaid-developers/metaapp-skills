@@ -4,7 +4,51 @@
 
 本目录包含可在 **Claude Code**（Cursor / Claude IDE）中使用的 MetaApp 开发与打包 Skills。通过 OpenSkills 安装后，可在对话中使用 `/skills` 查看并启用这些能力。
 
-## 如何在Claude Code中引入MetaApp Skills
+---
+
+## 在 Cursor/Claude 中安装并使用 MetaApp SKILL（完整流程）
+
+以下说明帮助你在 Cursor 或 Claude IDE 中完成环境准备、安装与首次使用 MetaApp SKILL。
+
+### 1. 安装 Node.js 环境
+
+运行 MetaApp SKILL 前，请确保本机已安装 **Node.js**。
+
+- **下载地址**：<https://nodejs.org/>
+- **版本要求**：需 **Node.js 20.x 及以上**（建议使用 LTS 版本）。
+
+**安装步骤（以 Windows / macOS 为例）：**
+
+1. 打开 [Node.js 官网](https://nodejs.org/)，选择 **LTS（长期支持版）** 下载安装包。
+2. **Windows**：运行下载的 `.msi` 安装程序，按向导下一步完成安装；勾选 “Add to PATH” 以便在终端使用 `node`、`npm`。
+3. **macOS**：运行 `.pkg` 安装程序完成安装；或使用 [Homebrew](https://brew.sh/) 执行：`brew install node`。
+4. 安装完成后，打开终端（或 Cursor 内置终端），执行：
+   ```bash
+   node -v
+   npm -v
+   ```
+   若分别输出版本号（如 `v20.x.x`、`10.x.x`），说明 Node 环境已就绪。
+
+### 2. 安装 Cursor（以 Cursor 为例）
+
+- **下载地址**：<https://cursor.com/cn/download>
+- 下载并安装 Cursor 后，按需完成登录、注册与付费开通；具体操作可搜索「Cursor 登录 / 注册 / 付费」等视频教程，此处不展开。
+
+### 3. 安装 MetaApp SKILL
+
+上述环境与 Cursor 准备就绪后，请按照本文档下一节 **「如何在 Claude Code、Cursor 中引入 MetaApp Skills」** 的说明，使用 OpenSkills 安装 MetaApp SKILL。
+
+### 4. 验证 MetaApp SKILL 是否可用
+
+安装成功后，可在 Cursor 对话中直接使用自然语言与 SKILL 交互，例如：
+
+- 输入：**「帮我创建一个名字叫 XXX 的 MetaID-Agent」**
+
+首次执行时，会拉取并安装项目所需依赖；若出现安装或执行确认提示，在对话框中点击 **确认 / 接受** 即可。若 Agent 创建成功，即表示 MetaApp SKILL 已正常安装并可继续使用其他能力（如群聊、发送 Buzz 等）。
+
+---
+
+## 如何在Claude Code，Cursor中引入MetaApp Skills
 
 1. 在 IDE 终端中执行：
    ```bash
@@ -16,7 +60,7 @@
    ```
    即可看到刚拉取的 MetaApp Skills，并可按需启用。
 
-## 如何在Cursor，Codex等其他Agent平台中引入MetaApp Skills
+## 如何在Codex等其他Agent平台中引入MetaApp Skills
 
 1. 在 IDE 终端中执行：
    ```bash
@@ -41,5 +85,6 @@ npx openskills update
 
 - **metaapp-develop**：基于 IDFramework 架构开发完整 MetaApp 前端项目（模板、组件、命令、开发指南）。
 - **metaapp-builder**：将已完成的 MetaApp 前端项目打包为可发布的 zip 压缩包。
-- **MetaID-Agent**: 用于创建MetaID Agent,集成钱包创建，生成MetaID账户,发送交易等功能(持续更新中)。
+- **MetaID-Agent**: 用于创建MetaID Agent,集成钱包创建，生成MetaID账户,设置头像，发送交易等功能(持续更新中)。
+- **MetaID-Agent-Chat**: 用于MetaID-Agent群聊功能(持续更新中)。
 详细说明与触发方式见各 Skill 目录下的 `SKILL.md`。

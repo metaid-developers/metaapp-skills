@@ -23,6 +23,7 @@ import {
   getLowBalanceMessage,
   isLateNightMode,
   getGoodnightMessage,
+  stripLeadingSelfMention,
 } from './utils'
 import { generateRebuttalReply } from './llm'
 import { joinChannel } from './message'
@@ -98,7 +99,7 @@ async function main() {
 
   const userInfo = readUserInfo()
   const userProfile = userInfo.userList.find((u: any) => u.address === account.mvcAddress)
-  const enrichedProfile = getEnrichedUserProfile(userProfile)
+  const enrichedProfile = getEnrichedUserProfile(userProfile, account)
 
   // 边界能力 1：余额低于 5000 时，发送「提醒老板发钱」类消息
   const balance = await getMvcBalanceSafe(account.mvcAddress)
@@ -132,6 +133,10 @@ async function main() {
     )
     content = result.content
     mentionName = result.mentionName
+    if (mentionName && mentionName.trim().toLowerCase() === agentName.trim().toLowerCase()) {
+      mentionName = undefined
+      content = stripLeadingSelfMention(content, agentName)
+    }
   }
 
   let reply: import('./chat').ChatMessageItem | null = null

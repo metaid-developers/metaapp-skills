@@ -2,7 +2,7 @@
 
 import * as path from 'path'
 import { joinChannel } from './message'
-import { readConfig, addGroupToUser, hasJoinedGroup, findAccountByUsername } from './utils'
+import { readConfig, addGroupToUser, hasJoinedGroup, findAccountByUsername, startGroupChatListenerAndPrintInstructions } from './utils'
 
 // Import createPin from MetaID-Agent skill (cross-skill call)
 let createPin: any = null
@@ -79,6 +79,10 @@ async function joinGroup() {
           account.globalMetaId
         )
         console.log('✅ User info updated')
+
+        // 加群成功后默认开启群聊监听，并输出关闭/查看群聊的脚本说明
+        console.log('\n📡 正在为您开启群聊监听...\n')
+        startGroupChatListenerAndPrintInstructions(config.groupId, account.userName)
       } else {
         throw new Error('No txids returned')
       }

@@ -11,6 +11,14 @@ MetaID-Agent-Chat/node_modules/
 MetaID-Agent-Chat/agent.md
 MetaID-Agent-Chat/my_discussion.log
 
+
+projects/**/*
+
+# 群聊监听与场景回复 PID 文件（运行时）
+.group_chat_listener.pid
+.scenario_*.pid
+.group_listener_launch.sh
+
 # 根目录下的敏感文件（account.json、.env、config.json、userInfo.json、group-list-history.log）
 account.json
 .env
@@ -19,3 +27,5 @@ config.json
 userInfo.json
 group-list-history.log
 agent.md
+agent2.md
+agent3.md

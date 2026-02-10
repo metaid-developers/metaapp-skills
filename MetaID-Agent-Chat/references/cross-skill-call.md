@@ -76,11 +76,14 @@ MetaID-Agent-Chat needs to access account information from root `account.json` t
       "mnemonic": "...",
       "mvcAddress": "...",
       "userName": "...",
-      "globalMetaId": "..."
+      "globalMetaId": "...",
+      "llm": [{ "provider": "deepseek", "apiKey": "", ... }]
     }
   ]
 }
 ```
+
+`llm` 为数组，`llm[0]` 默认来自 .env；未指定时使用第一项。
 
 ## Error Handling
 

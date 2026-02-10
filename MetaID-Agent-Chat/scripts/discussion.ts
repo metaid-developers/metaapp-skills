@@ -18,6 +18,7 @@ import {
   readGroupListHistory,
   getEnrichedUserProfile,
   filterAgentsWithBalance,
+  stripLeadingSelfMention,
 } from './utils'
 import {
   generateDiscussionMessage,
@@ -204,7 +205,7 @@ async function agentSpeak(
 
     // Generate message using LLM（含话题性交互、反驳、口语化）
     console.log(`🤖 ${agentName} 正在生成回复...`)
-    const enrichedProfile = getEnrichedUserProfile(userProfile)
+    const enrichedProfile = getEnrichedUserProfile(userProfile, account)
     const { content: messageContent, mentionName } = await generateDiscussionMessage(
       agentName,
       topic,
@@ -214,28 +215,34 @@ async function agentSpeak(
       messageCount,
       llmConfig
     )
+    let contentToSend = messageContent
+    let mentionToUse = mentionName
+    if (mentionToUse && mentionToUse.trim().toLowerCase() === agentName.trim().toLowerCase()) {
+      mentionToUse = undefined
+      contentToSend = stripLeadingSelfMention(contentToSend, agentName)
+    }
 
     console.log(`\n💬 ${agentName} (第${messageCount + 1}次发言):`)
-    console.log(`   ${messageContent}`)
+    console.log(`   ${contentToSend}`)
 
     // 解析 reply 与 mention：若 LLM 指定了 mentionName，则回复对方最后一条消息并 @ 对方
     let reply: import('./chat').ChatMessageItem | null = null
     let mentions: import('./message').Mention[] = []
-    if (mentionName) {
+    if (mentionToUse) {
       const targetEntry = [...recentEntries].reverse().find(
-        (e) => (e.userInfo?.name || '').trim().toLowerCase() === mentionName.trim().toLowerCase()
+        (e) => (e.userInfo?.name || '').trim().toLowerCase() === mentionToUse!.trim().toLowerCase()
       )
       if (targetEntry) {
         reply = { txId: targetEntry.txId } as import('./chat').ChatMessageItem
         const gid = targetEntry.globalMetaId || targetEntry.userInfo?.globalMetaId
         const targetUser = readUserInfo().userList.find(
-          (u) => (u.userName || '').trim().toLowerCase() === mentionName.trim().toLowerCase()
+          (u) => (u.userName || '').trim().toLowerCase() === mentionToUse!.trim().toLowerCase()
         )
         const globalMetaId = gid || targetUser?.globalmetaid
         if (globalMetaId) {
           mentions = getMention({
             globalMetaId,
-            userName: targetEntry.userInfo?.name || targetUser?.userName || mentionName,
+            userName: targetEntry.userInfo?.name || targetUser?.userName || mentionToUse,
           })
         }
       }
@@ -244,7 +251,7 @@ async function agentSpeak(
     // Send message
     const result = await sendTextForChat(
       groupId,
-      messageContent,
+      contentToSend,
       0,
       secretKeyStr,
       reply,
@@ -348,17 +355,23 @@ ${discussionText || '（无具体内容）'}
   }
 }
 
-/**
- * Main discussion function
- * @param overrides - Optional overrides: { topic, agents, targetMessages, topicAnnouncer }
- */
-async function runDiscussion(overrides?: {
+/** 默认群 ID（🤖MetaID-Agent畅聊群） */
+const DEFAULT_GROUP_ID = 'c1d5c0c7c4430283b3155b25d59d98ba95b941d9bfc3542bf89ba56952058f85i0'
+
+export interface RunDiscussionOverrides {
   topic?: string
   agents?: string[]
   targetMessages?: number
   topicAnnouncer?: string
-}) {
-  const groupId = 'c1d5c0c7c4430283b3155b25d59d98ba95b941d9bfc3542bf89ba56952058f85i0' // 🤖MetaID-Agent畅聊群
+  groupId?: string
+}
+
+/**
+ * Main discussion function
+ * @param overrides - Optional overrides: { topic, agents, targetMessages, topicAnnouncer, groupId }
+ */
+export async function runDiscussion(overrides?: RunDiscussionOverrides) {
+  const groupId = overrides?.groupId || DEFAULT_GROUP_ID
   let topic = '有了AI人类就不需要学习了?'
   let allAgents = ['大有益', 'Chloé', 'Satō', '肥猪王', 'AI Bear', 'AI Eason']
   let targetMessages = 8
@@ -583,10 +596,10 @@ async function runDiscussion(overrides?: {
   console.log(`\n🏆 本场MVP: ${mvp}`)
 }
 
-// Run discussion (support CLI overrides: METAWEB_TOPIC, METAWEB_AGENTS env vars)
+// Run discussion when executed directly (support CLI overrides: METAWEB_TOPIC, METAWEB_AGENTS env vars)
 const metawebTopic = process.env.METAWEB_TOPIC
 const metawebAgents = process.env.METAWEB_AGENTS
-const overrides = metawebTopic || metawebAgents
+const overrides: RunDiscussionOverrides | undefined = metawebTopic || metawebAgents
   ? {
       topic: metawebTopic,
       agents: metawebAgents ? metawebAgents.split(',').map((s) => s.trim()) : undefined,
@@ -595,7 +608,9 @@ const overrides = metawebTopic || metawebAgents
     }
   : undefined
 
-runDiscussion(overrides).catch((error) => {
-  console.error('Fatal error:', error)
-  process.exit(1)
-})
+if (require.main === module) {
+  runDiscussion(overrides).catch((error) => {
+    console.error('Fatal error:', error)
+    process.exit(1)
+  })
+}

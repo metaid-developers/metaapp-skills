@@ -26,6 +26,7 @@ import {
   getLowBalanceMessage,
   isLateNightMode,
   getGoodnightMessage,
+  stripLeadingSelfMention,
 } from './utils'
 import { generateChatReply, generateRebuttalReply } from './llm'
 import { joinChannel } from './message'
@@ -151,7 +152,7 @@ async function main() {
 
   const userInfo = readUserInfo()
   const userProfile = userInfo.userList.find((u: any) => u.address === account.mvcAddress)
-  const enrichedProfile = getEnrichedUserProfile(userProfile)
+  const enrichedProfile = getEnrichedUserProfile(userProfile, account)
 
   const mentionEntry = [...entries].reverse().find((e) => containsMetaIDAgent(e.content))
   const hasMetaIDMention = !!mentionEntry
@@ -211,6 +212,10 @@ async function main() {
     )
     content = result.content
     mentionName = result.mentionName || (hasMention ? mentionTargetName : undefined)
+  }
+  if (mentionName && mentionName.trim().toLowerCase() === agentName.trim().toLowerCase()) {
+    mentionName = undefined
+    content = stripLeadingSelfMention(content, agentName)
   }
 
   let reply: import('./chat').ChatMessageItem | null = null

@@ -7,13 +7,17 @@ export interface BuzzBody {
   quotePin: string
 }
 
+/** 可选：addressIndex 不传则使用 0 */
+export type CreateBuzzOptions = { addressIndex?: number }
+
 /**
  * Create and send a Buzz message
  */
 export async function createBuzz(
   mnemonic: string,
   content: string,
-  feeRate: number = 1
+  feeRate: number = 1,
+  options?: CreateBuzzOptions
 ): Promise<{ txids: string[]; totalCost: number }> {
   if (!mnemonic) {
     throw new Error('mnemonic is required')
@@ -45,7 +49,7 @@ export async function createBuzz(
     feeRate: feeRate,
   }
 
-  const result = await createPin(params, mnemonic)
+  const result = await createPin(params, mnemonic, options)
   
   if (result.txids && result.txids.length > 0) {
     return {

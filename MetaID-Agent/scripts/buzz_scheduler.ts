@@ -10,7 +10,7 @@
 import * as path from 'path'
 import * as fs from 'fs'
 import { createBuzz } from './buzz'
-import { getUtxos } from './wallet'
+import { getUtxos, parseAddressIndexFromPath } from './wallet'
 import { readAccountFile, findAccountByKeyword } from './utils'
 
 const CONFIG_PATH = path.join(__dirname, '..', 'buzz_scheduler_config.json')
@@ -168,17 +168,18 @@ async function fetchContent(config: BuzzSchedulerConfig): Promise<{
 /**
  * 获取 MVC 余额（satoshis）
  */
-async function getMvcBalance(mnemonic: string): Promise<number> {
-  const utxos = await getUtxos('mvc', mnemonic)
+async function getMvcBalance(mnemonic: string, addressIndex?: number): Promise<number> {
+  const utxos = await getUtxos('mvc', mnemonic, addressIndex != null ? { addressIndex } : undefined)
   return utxos.reduce((sum: number, u: any) => sum + (u.value || 0), 0)
 }
 
 async function runOnce(
   config: BuzzSchedulerConfig,
-  account: { mnemonic: string; userName: string },
+  account: { mnemonic: string; userName: string; path?: string },
   executionCount: number
 ): Promise<boolean> {
-  const balance = await getMvcBalance(account.mnemonic)
+  const addressIndex = account.path != null ? parseAddressIndexFromPath(account.path) : undefined
+  const balance = await getMvcBalance(account.mnemonic, addressIndex)
   if (balance < config.minBalanceSatoshis) {
     console.log(`⚠️ MVC 余额不足: ${balance} satoshis < ${config.minBalanceSatoshis}，任务结束`)
     return false
@@ -194,7 +195,9 @@ async function runOnce(
   const buzzContent = `${fetched.content}\n\n📅 发送时间: ${sendTime}\n🔗 来源: ${fetched.source}`
 
   try {
-    const result = await createBuzz(account.mnemonic, buzzContent, config.feeRate)
+    const result = await createBuzz(account.mnemonic, buzzContent, config.feeRate, {
+      addressIndex,
+    })
     console.log(
       `✅ [${executionCount}/${config.maxExecutions}] Buzz 发送成功 | TXID: ${result.txids[0]?.slice(0, 16)}... | 消耗: ${result.totalCost} satoshis`
     )

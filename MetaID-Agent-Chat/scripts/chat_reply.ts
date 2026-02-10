@@ -27,6 +27,7 @@ import {
   getLowBalanceMessage,
   isLateNightMode,
   getGoodnightMessage,
+  stripLeadingSelfMention,
 } from './utils'
 import { generateChatReply } from './llm'
 import { joinChannel } from './message'
@@ -40,7 +41,8 @@ try {
   process.exit(1)
 }
 
-const GROUP_ID = 'c1d5c0c7c4430283b3155b25d59d98ba95b941d9bfc3542bf89ba56952058f85i0'
+/** 默认群 ID，优先使用 readConfig().groupId */
+const DEFAULT_GROUP_ID = 'c1d5c0c7c4430283b3155b25d59d98ba95b941d9bfc3542bf89ba56952058f85i0'
 const METAID_AGENT_KEYWORDS = ['MetaID-Agent', 'MetaID Agent', 'metaid-agent', 'MetaIDAgent']
 
 function getLLMConfig(config: any) {
@@ -84,9 +86,11 @@ function pickRandomAgent(agents: string[]): string {
 }
 
 async function main() {
-  const specifiedAgent = process.argv[2]?.trim()
+  // 优先从环境变量读取（避免 spawn shell 将 "AI Eason" 拆成 argv[2]="AI" argv[3]="Eason"）
+  const specifiedAgent = (process.env.AGENT_NAME || process.argv[2])?.trim()
 
   const config = readConfig()
+  const GROUP_ID = config.groupId || DEFAULT_GROUP_ID
   config.groupId = GROUP_ID
   writeConfig(config)
 
@@ -166,6 +170,18 @@ async function main() {
     process.exit(1)
   }
 
+  // 禁止自己回复自己：若最新一条消息来自本 Agent，跳过本次回复
+  if (entries.length > 0) {
+    const lastEntry = entries[entries.length - 1]
+    const lastSpeakerName = (lastEntry.userInfo?.name || '').trim().toLowerCase()
+    const lastIsSelf =
+      lastSpeakerName === agentName.trim().toLowerCase() || lastEntry.address === account.mvcAddress
+    if (lastIsSelf) {
+      console.log('   ⏭️  最新一条消息来自本 Agent，跳过回复（禁止自己回复自己）')
+      return
+    }
+  }
+
   if (!hasJoinedGroup(account.mvcAddress, GROUP_ID)) {
     const joinResult = await joinChannel(GROUP_ID, account.mnemonic, createPin)
     if (joinResult.txids?.length) {
@@ -175,7 +191,7 @@ async function main() {
 
   const userInfo = readUserInfo()
   const userProfile = userInfo.userList.find((u: any) => u.address === account.mvcAddress)
-  const enrichedProfile = getEnrichedUserProfile(userProfile)
+  const enrichedProfile = getEnrichedUserProfile(userProfile, account)
 
   // 边界能力 1：余额低于 5000 时，发送「提醒老板发钱」类消息
   const balance = await getMvcBalanceSafe(account.mvcAddress)
@@ -221,6 +237,11 @@ async function main() {
     )
     content = result.content
     mentionName = result.mentionName
+    // 禁止 @自己：若 LLM 返回 @ 的是自己，清除 mention 并去掉内容中的 @自己
+    if (mentionName && mentionName.trim().toLowerCase() === agentName.trim().toLowerCase()) {
+      mentionName = undefined
+      content = stripLeadingSelfMention(content, agentName)
+    }
   }
 
   let reply: import('./chat').ChatMessageItem | null = null

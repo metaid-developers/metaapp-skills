@@ -10,6 +10,9 @@ export class HttpRequest {
     this.options = options
   }
 
+  /** 请求超时时间（毫秒），避免无网络时长时间挂起 */
+  private static readonly REQUEST_TIMEOUT_MS = 20000
+
   private async makeRequest(
     method: string,
     url: string,
@@ -23,9 +26,13 @@ export class HttpRequest {
       ...headers,
     })
 
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), HttpRequest.REQUEST_TIMEOUT_MS)
+
     const requestOptions: RequestInit = {
       method,
       headers: requestHeaders,
+      signal: controller.signal,
     }
 
     if (data && (method === 'POST' || method === 'PUT' || method === 'PATCH')) {
@@ -34,6 +41,7 @@ export class HttpRequest {
 
     try {
       const response = await fetch(fullUrl, requestOptions)
+      clearTimeout(timeoutId)
       
       // Check if response is OK
       if (!response.ok) {
@@ -93,8 +101,21 @@ export class HttpRequest {
       }
 
       return await response.json()
-    } catch (error) {
-      // Handle error
+    } catch (error: any) {
+      clearTimeout(timeoutId)
+      // 将 fetch 的「fetch failed」细化为可读原因（网络不可达、超时、DNS 等）
+      const cause = error?.cause
+      const msg = error?.message || String(error)
+      const detail =
+        cause?.message || cause?.code || (error?.name === 'AbortError' ? '请求超时(20s)' : '')
+      if (msg === 'fetch failed' && detail) {
+        const enriched = new Error(`${msg}: ${detail}. URL: ${fullUrl}`)
+        ;(enriched as any).cause = cause
+        if (this.options.errorHandel) {
+          return await this.options.errorHandel(enriched)
+        }
+        throw enriched
+      }
       if (this.options.errorHandel) {
         return await this.options.errorHandel(error)
       }

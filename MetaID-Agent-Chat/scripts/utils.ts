@@ -1,5 +1,6 @@
 import * as fs from 'fs'
 import * as path from 'path'
+import { spawnSync } from 'child_process'
 import { ChatMessageItem, computeDecryptedMsg, getChannelNewestMessages } from './chat'
 import { ensureConfigFiles, getEnv, configFromEnv, type GroupInfoItem } from './env-config'
 
@@ -7,6 +8,7 @@ import { ensureConfigFiles, getEnv, configFromEnv, type GroupInfoItem } from './
 const ROOT_DIR = path.join(__dirname, '..', '..')
 const CONFIG_FILE = path.join(ROOT_DIR, 'config.json')
 const USER_INFO_FILE = path.join(ROOT_DIR, 'userInfo.json')
+const ACCOUNT_FILE = path.join(ROOT_DIR, 'account.json')
 const GROUP_LIST_HISTORY_FILE = path.join(ROOT_DIR, 'group-list-history.log')
 const OLD_GROUP_LIST_HISTORY_FILE = path.join(__dirname, '..', 'group-list-history.log')
 
@@ -398,6 +400,77 @@ export function forceUpdateUserProfile(
   writeUserInfo(userInfo)
 }
 
+const PROFILE_KEYS = [
+  'character',
+  'preference',
+  'goal',
+  'masteringLanguages',
+  'stanceTendency',
+  'debateStyle',
+  'interactionStyle',
+] as const
+
+/**
+ * 默认帮用户开启群聊监听（后台进程），并输出关闭监听、查看群聊的脚本说明
+ * 用于：Agent 加群成功后、或用户要求某 Agent 在群里回复/讨论时自动调用
+ */
+export function startGroupChatListenerAndPrintInstructions(
+  groupId: string,
+  agentName?: string
+): void {
+  try {
+    const scriptDir = path.join(__dirname, '..')
+    const scriptPath = path.join(scriptDir, 'scripts', 'run_group_chat_listener.sh')
+    if (!fs.existsSync(scriptPath)) {
+      console.warn('⚠️ 未找到 run_group_chat_listener.sh，跳过自动开启群聊监听')
+      return
+    }
+    const args = [groupId]
+    if (agentName) args.push(agentName)
+    const result = spawnSync('bash', [scriptPath, ...args], {
+      cwd: scriptDir,
+      stdio: 'inherit',
+      shell: false,
+    })
+    if (result.status !== 0) {
+      console.warn('⚠️ 启动群聊监听脚本退出码:', result.status)
+    }
+  } catch (e) {
+    console.warn('⚠️ 自动开启群聊监听失败:', (e as Error).message)
+  }
+}
+
+/**
+ * 群聊启动阶段：若 userInfo.json 的 userList 项有上述人设字段而 account.json 同地址账户缺失，则平移到 account.json
+ */
+export function migrateUserInfoProfileToAccount(): void {
+  try {
+    if (!fs.existsSync(USER_INFO_FILE) || !fs.existsSync(ACCOUNT_FILE)) return
+    const userInfo = readUserInfo()
+    const accountContent = fs.readFileSync(ACCOUNT_FILE, 'utf-8')
+    const accountData: { accountList: any[] } = JSON.parse(accountContent)
+    let changed = false
+    for (const user of userInfo.userList) {
+      const acc = accountData.accountList?.find((a: any) => a.mvcAddress === user.address)
+      if (!acc) continue
+      for (const key of PROFILE_KEYS) {
+        const userVal = (user as any)[key]
+        const accVal = acc[key]
+        if (userVal !== undefined && userVal !== '' && (accVal === undefined || accVal === '' || (Array.isArray(accVal) && accVal.length === 0))) {
+          (acc as any)[key] = userVal
+          changed = true
+        }
+      }
+    }
+    if (changed) {
+      fs.writeFileSync(ACCOUNT_FILE, JSON.stringify(accountData, null, 4), 'utf-8')
+      console.log('📦 已从 userInfo.json 平移人设到 account.json')
+    }
+  } catch (e) {
+    console.warn('⚠️ migrateUserInfoProfileToAccount:', (e as Error).message)
+  }
+}
+
 /**
  * Read group-list-history.log（根目录）
  */
@@ -555,11 +628,13 @@ export function processAndWriteMessages(
  * - 使用 startIndex = grouplastIndex + 1 拉取新消息，避免重复拉取
  * - 若 grouplastIndex=0 则用 startIndex=1（index 从 1 开始）
  * - 保留最近 300 条由 writeGroupListHistory 的 cleanup 处理
+ *
+ * @returns 是否拉取并处理了消息（用于决定是否触发回复）
  */
 export async function fetchAndUpdateGroupHistory(
   groupId: string,
   secretKeyStr: string
-): Promise<void> {
+): Promise<boolean> {
   const config = readConfig()
   config.groupId = groupId
 
@@ -571,24 +646,43 @@ export async function fetchAndUpdateGroupHistory(
     })
   }
 
+  const maxRetries = 3
+  const retryDelayMs = 2000
   let messagesData: Awaited<ReturnType<typeof tryFetch>> | null = null
 
-  try {
-    const nextStart = config.grouplastIndex + 1
-    const primaryStart = String(Math.max(1, nextStart))
-    messagesData = await tryFetch(primaryStart)
-    if (!messagesData?.list || messagesData.list.length === 0) {
-      if (config.grouplastIndex === 0) {
-        messagesData = await tryFetch('1')
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const nextStart = config.grouplastIndex + 1
+      const primaryStart = String(Math.max(1, nextStart))
+      messagesData = await tryFetch(primaryStart)
+      if (!messagesData?.list || messagesData.list.length === 0) {
+        if (config.grouplastIndex === 0) {
+          messagesData = await tryFetch('1')
+        }
       }
+      break
+    } catch (error: any) {
+      const causeMsg = error?.cause?.message || error?.cause?.code || ''
+      const detail = causeMsg ? ` (原因: ${causeMsg})` : ''
+      console.error(
+        `⚠️  fetchAndUpdateGroupHistory 拉取失败 [${attempt}/${maxRetries}]:`,
+        error.message + detail
+      )
+      if (error?.message?.includes('fetch failed') || error?.message?.includes('请求超时')) {
+        console.error(
+          '   提示: 接口 https://api.idchat.io/chat-api 需本机可访问。若用 nohup 后台运行，请在系统终端（如 Terminal.app）中执行以保障网络权限。'
+        )
+      }
+      if (attempt < maxRetries) {
+        await new Promise((r) => setTimeout(r, retryDelayMs))
+        continue
+      }
+      return false
     }
-  } catch (error: any) {
-    console.error('⚠️  fetchAndUpdateGroupHistory 拉取失败:', error.message)
-    return
   }
 
   if (!messagesData?.list || messagesData.list.length === 0) {
-    return
+    return false
   }
 
   processAndWriteMessages(messagesData.list, groupId, secretKeyStr)
@@ -604,6 +698,7 @@ export async function fetchAndUpdateGroupHistory(
   )
   config.grouplastIndex = newLastIndex
   writeConfig(config)
+  return true
 }
 
 /**
@@ -697,34 +792,55 @@ function extractTopics(messages: string[]): string[] {
 }
 
 /**
- * 获取完整人设（缺失字段用默认值填充，用于讨论生成）
+ * 获取完整人设（优先使用 account 的人设，供 LLM 作为 config 传入；不限于群聊）
+ * @param user userInfo.json 中的用户
+ * @param account 根目录 account.json 中同地址账户（若提供则优先使用其人设字段）
  */
-export function getEnrichedUserProfile(user: UserInfo | undefined): UserInfo & {
+export function getEnrichedUserProfile(
+  user: UserInfo | undefined,
+  account?: {
+    character?: string
+    preference?: string
+    goal?: string
+    masteringLanguages?: string[]
+    stanceTendency?: string
+    debateStyle?: string
+    interactionStyle?: string
+  } | null
+): UserInfo & {
   stanceTendency: string
   debateStyle: string
   interactionStyle: string
 } {
-  if (!user) {
-    return {
-      address: '',
-      globalmetaid: '',
-      metaid: '',
-      userName: '',
-      groupList: [],
-      character: '友好',
-      preference: '广泛',
-      goal: '参与讨论',
-      masteringLanguages: ['中文'],
-      stanceTendency: getRandomItem(STANCE_OPTIONS),
-      debateStyle: getRandomItem(DEBATE_STYLE_OPTIONS),
-      interactionStyle: getRandomItem(INTERACTION_STYLE_OPTIONS),
-    } as any
-  }
+  const fallback = {
+    address: '',
+    globalmetaid: '',
+    metaid: '',
+    userName: '',
+    groupList: [],
+    character: '友好',
+    preference: '广泛',
+    goal: '参与讨论',
+    masteringLanguages: ['中文'],
+    stanceTendency: getRandomItem(STANCE_OPTIONS),
+    debateStyle: getRandomItem(DEBATE_STYLE_OPTIONS),
+    interactionStyle: getRandomItem(INTERACTION_STYLE_OPTIONS),
+  } as any
+  if (!user) return fallback
   return {
     ...user,
-    stanceTendency: user.stanceTendency || getRandomItem(STANCE_OPTIONS),
-    debateStyle: user.debateStyle || getRandomItem(DEBATE_STYLE_OPTIONS),
-    interactionStyle: user.interactionStyle || getRandomItem(INTERACTION_STYLE_OPTIONS),
+    character: account?.character || user.character || fallback.character,
+    preference: account?.preference || user.preference || fallback.preference,
+    goal: account?.goal || user.goal || fallback.goal,
+    masteringLanguages:
+      (account?.masteringLanguages?.length ? account.masteringLanguages : null) ||
+      (user.masteringLanguages?.length ? user.masteringLanguages : null) ||
+      fallback.masteringLanguages,
+    stanceTendency:
+      account?.stanceTendency || user.stanceTendency || getRandomItem(STANCE_OPTIONS),
+    debateStyle: account?.debateStyle || user.debateStyle || getRandomItem(DEBATE_STYLE_OPTIONS),
+    interactionStyle:
+      account?.interactionStyle || user.interactionStyle || getRandomItem(INTERACTION_STYLE_OPTIONS),
   } as any
 }
 
@@ -847,6 +963,37 @@ export function getAgentsInGroup(groupId: string): string[] {
   return agents
 }
 
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+/** 去掉内容开头的 @自己（禁止 Agent @自己），供群聊回复/讨论等使用 */
+export function stripLeadingSelfMention(content: string, selfName: string): string {
+  if (!content || !selfName) return content
+  const escaped = selfName.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const re = new RegExp(`^@${escaped}\\s+`, 'i')
+  const out = content.replace(re, '').trim()
+  return out || content
+}
+
+/** 检测消息中是否 @提及 了某 MetaID-Agent，返回被提及的 Agent 名（取最近一条） */
+export function findMentionedAgent(
+  entries: { content: string; userInfo?: { name?: string } }[],
+  agentNames: string[]
+): string | null {
+  for (let i = entries.length - 1; i >= 0; i--) {
+    const content = (entries[i].content || '').trim()
+    for (const name of agentNames) {
+      if (!name || !name.trim()) continue
+      const pattern = new RegExp(`@${escapeRegExp(name.trim())}(?:\\s|$|[，。！？、])`, 'i')
+      if (pattern.test(content)) {
+        return name.trim()
+      }
+    }
+  }
+  return null
+}
+
 /** MVC 余额不足阈值（satoshis），低于此值不参与群聊发言 */
 export const MIN_BALANCE_SATOSHIS = 1000
 
@@ -930,7 +1077,8 @@ export async function filterAgentsWithBalance(
       continue
     }
     if (balance < minSatoshis) {
-      console.log(`⚠️ [余额不足] Agent: ${name}, 地址: ${account.mvcAddress}, 余额: ${balance} satoshis (需 >= ${minSatoshis})，不参与`)
+      const hint = balance === 0 ? '（若为 nohup/无外网环境，可能因 fetch 失败被误判为 0，建议在系统终端中启动监听）' : ''
+      console.log(`⚠️ [余额不足] Agent: ${name}, 地址: ${account.mvcAddress}, 余额: ${balance} satoshis (需 >= ${minSatoshis})，不参与${hint}`)
       continue
     }
     result.push(name)
@@ -939,20 +1087,26 @@ export async function filterAgentsWithBalance(
 }
 
 /**
- * Find account by username from MetaID-Agent
+ * Find account by username from root account.json（含人设字段，供 LLM 作为 config 使用）
  */
 export function findAccountByUsername(username: string): {
   mnemonic: string
   mvcAddress: string
   userName: string
   globalMetaId?: string
+  character?: string
+  preference?: string
+  goal?: string
+  masteringLanguages?: string[]
+  stanceTendency?: string
+  debateStyle?: string
+  interactionStyle?: string
 } | null {
   try {
-    const accountFile = path.join(ROOT_DIR, 'account.json')
-    if (fs.existsSync(accountFile)) {
-      const content = fs.readFileSync(accountFile, 'utf-8')
+    if (fs.existsSync(ACCOUNT_FILE)) {
+      const content = fs.readFileSync(ACCOUNT_FILE, 'utf-8')
       const data = JSON.parse(content)
-      const account = data.accountList?.find((acc: any) => 
+      const account = data.accountList?.find((acc: any) =>
         acc.userName && acc.userName.toLowerCase() === username.toLowerCase()
       )
       if (account) {
@@ -961,11 +1115,18 @@ export function findAccountByUsername(username: string): {
           mvcAddress: account.mvcAddress,
           userName: account.userName,
           globalMetaId: account.globalMetaId,
+          character: account.character,
+          preference: account.preference,
+          goal: account.goal,
+          masteringLanguages: account.masteringLanguages,
+          stanceTendency: account.stanceTendency,
+          debateStyle: account.debateStyle,
+          interactionStyle: account.interactionStyle,
         }
       }
     }
   } catch (error) {
-    console.error('Error reading MetaID-Agent account.json:', error)
+    console.error('Error reading account.json:', error)
   }
   return null
 }

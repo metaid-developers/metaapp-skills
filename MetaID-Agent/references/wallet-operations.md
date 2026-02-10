@@ -55,11 +55,24 @@ Wallet information is stored in `account.json` at the **project root** with the 
       "dogeAddress": "DOGE address",
       "publicKey": "hex public key",
       "userName": "username or empty string",
-      "path": "m/44'/10001'/0'/0/0"
+      "path": "m/44'/10001'/0'/0/0",
+      "globalMetaId": "optional",
+      "llm": [
+        {
+          "provider": "deepseek",
+          "apiKey": "",
+          "baseUrl": "https://api.deepseek.com",
+          "model": "DeepSeek-V3.2",
+          "temperature": 0.8,
+          "maxTokens": 500
+        }
+      ]
     }
   ]
 }
 ```
+
+**llm 为数组**：`llm[0]` 默认来自 .env；未指定时使用 `llm[0]`；可用 `getAccountLLM(account, index)` 获取。
 
 ### Account Selection Logic
 
@@ -71,12 +84,44 @@ Wallet information is stored in `account.json` at the **project root** with the 
 
 ## Wallet Operations
 
+### addressIndex 兼容说明
+
+所有涉及「当前账户」的接口均支持通过 **addressIndex** 指定推导路径中的地址索引（BIP44 path 最后一节，如 `m/44'/10001'/0'/0/3` 中的 `3`）。不传时默认为 `0`。
+
+- **从 account.path 解析**：使用 `parseAddressIndexFromPath(account.path)`（由 `wallet.ts` 导出）。
+- **新建 agent/钱包**：使用默认 path 时 addressIndex 为 `0`，可传 `{ addressIndex: 0 }` 或省略。
+
+以下接口均支持在 options 或参数中传入 `addressIndex`（不传则使用 0）：
+
+| 接口 | 说明 |
+|------|------|
+| `getCurrentWallet(chain, { mnemonic, addressIndex? })` | 获取当前链钱包 |
+| `getAddress(chain, mnemonic, { addressIndex? })` | 获取指定链地址 |
+| `getAllAddress(mnemonic, { addressIndex? })` | 获取 MVC/BTC/DOGE 地址 |
+| `getPublicKey(chain, mnemonic, { addressIndex? })` | 获取公钥 |
+| `getCredential({ mnemonic, chain?, message?, encoding?, addressIndex? })` | 签名凭证 |
+| `getUtxos(chain, mnemonic, { addressIndex? })` | 获取 UTXOs |
+| `createPin(params, mnemonic, { addressIndex? })`（metaid.ts） | 创建 Pin |
+| `payTransactions(mnemonic, ..., feeb?, { addressIndex? })` | 支付交易 |
+| `getEcdhPublickey(mnemonic, pubkey?, { addressIndex? })`（chatpubkey.ts） | ECDH 公钥 |
+| `createBuzz(mnemonic, content, feeRate?, { addressIndex? })`（buzz.ts） | 发送 Buzz |
+
+业务侧在拥有 `account` 时，应传入 `addressIndex: parseAddressIndexFromPath(account.path)`，以与 account.json 中该账户的 path 一致。
+
 ### Get Current Wallet
 
-```typescript
-import { getCurrentWallet, Chain } from './wallet'
+`getCurrentWallet` 支持在 options 中传入可选属性 `addressIndex`，不传则使用 `0`。
 
+```typescript
+import { getCurrentWallet, Chain, parseAddressIndexFromPath } from './wallet'
+
+// 使用默认 addressIndex 0
 const wallet = await getCurrentWallet(Chain.MVC, { mnemonic })
+
+// 指定 addressIndex（例如从 account.path 解析）
+const addressIndex = parseAddressIndexFromPath(account.path)
+const wallet2 = await getCurrentWallet(Chain.MVC, { mnemonic, addressIndex })
+
 const address = wallet.getAddress()
 const privateKey = wallet.getPrivateKey()
 ```
@@ -94,11 +139,31 @@ const credential = await getCredential({
 // Returns: { address, publicKey, signature }
 ```
 
-## Derivation Paths
+## Derivation Paths 与 getPath
 
-- **MVC Path**: `m/44'/10001'/0'/0/0`
-- **MVC Root Path**: `m/44'/10001'/0'/0`
-- **Address Index**: 0 (default)
+- **默认 Path**：`DEFAULT_PATH = m/44'/10001'/0'/0/0`（新建 agent 或无 account 时的回退值）
+- **MVC Root Path**：`m/44'/10001'/0'/0`（`getMvcRootPath()`）
+- **Address Index**：`getCurrentWallet` 的 options 中可选 `addressIndex`，不传则使用 0
+
+### getPath(options?)
+
+Path 优先从根目录 `account.json` 的 **要操作的** `accountList` 项中读取 `path` 字段。
+
+```typescript
+import { getPath, DEFAULT_PATH } from './wallet'
+
+// 使用当前要操作的 account（默认 accountList[0]）的 path
+const path0 = getPath()
+
+// 指定 accountList 下标
+const path1 = getPath({ accountIndex: 1 })
+
+// 新建 agent 时使用默认 path（不依赖 account.json）
+const pathNew = getPath({ defaultPath: DEFAULT_PATH })
+```
+
+- 不传参或只传 `accountIndex`：从 `readAccountFile()` 的 `accountList[accountIndex ?? 0]` 取 `path`，若无则返回 `DEFAULT_PATH`。
+- 传 `defaultPath`：直接返回该值（用于 createAgent / 新建钱包等场景）。
 
 ## Network Configuration
 

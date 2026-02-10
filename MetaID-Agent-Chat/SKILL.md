@@ -1,6 +1,6 @@
 ---
 name: MetaID-Agent-Chat
-description: Manage group chat messages, send messages, and join groups on the MetaID network. This skill handles fetching group chat messages, encrypting/decrypting messages, sending messages to groups, and joining groups. It works in conjunction with MetaID-Agent skill for blockchain operations. Use when users want to: (1) Fetch group chat messages from a specified group, (2) Send messages to a group chat, (3) Join a group chat, (4) Have MetaID Agents participate in group discussions based on topics. Requires Node.js >= 18.x.x, TypeScript, and MetaID-Agent skill as a dependency. Dependencies: crypto-js, meta-contract.
+description: Manage group chat messages, send messages, and join groups on the MetaID network. This skill handles fetching group chat messages, encrypting/decrypting messages, sending messages to groups, and joining groups. It works in conjunction with MetaID-Agent skill for blockchain operations. Use when users want to: (1) Fetch group chat messages from a specified group, (2) Send messages to a group chat, (3) Join a group chat, (4) Have MetaID Agents participate in group discussions based on topics, (5) 开启群聊/监听群聊/让 XX Agent 监听群聊信息 - Cursor/AI 必须直接帮用户执行启动脚本（一键即启动），除非用户明确要求手动启动，否则禁止仅输出命令让用户自行执行, (6) 对监听群聊内容进行具体 XX 场景的回复 - Cursor/AI 必须自动执行对应场景脚本. Requires Node.js >= 18.x.x, TypeScript, and MetaID-Agent skill as a dependency. Dependencies: crypto-js, meta-contract.
 ---
 
 # MetaID-Agent-Chat
@@ -14,6 +14,8 @@ MetaID-Agent-Chat skill provides comprehensive group chat management capabilitie
 3. **Join Groups** - Join group chats on the blockchain
 4. **Chat History Management** - Maintain and manage group chat history logs
 5. **Context-Aware Responses** - Generate responses based on chat context and topics
+6. **群聊监听自动启动** - When user says 开启群聊/监听群聊/让 XX Agent 监听群聊信息，Cursor/AI **必须自动执行**启动脚本（非仅输出命令），并告知用户关闭、查看群聊的脚本
+7. **场景回复后台进程** - When user requests scenario-specific replies (e.g. 狼人杀、话题对聊) while monitoring is on, Cursor/AI **必须自动执行**对应场景启动脚本（非仅输出命令），并提供关闭、日志脚本
 
 ## Prerequisites
 
@@ -230,6 +232,146 @@ The script accepts prompts in the following format:
 让AI Eason加入群聊
 ```
 
+## 群聊监听与场景回复
+
+当用户说「开启群聊」「监听群聊」「让 XX Agent 监听群聊信息」等时，MetaID-Agent-Chat skills 需要**自动为用户开启**群聊监听进程（默认使用系统终端，无需用户另行执行启动脚本），并告知用户关闭、查看群聊的脚本。监听启动后，若用户要求对监听内容进行具体 XX 场景的回复，则再在后台开启另一进程。
+
+### 0. Cursor/AI 自动执行原则（必读，严格执行）
+
+**核心规则**：当用户请求「开启群聊/监听群聊/让 XX Agent 监听群聊信息」等时，**必须直接帮用户执行启动脚本**，实现一键确认即启动；**除非用户明确强调要自己手动启动**，否则**禁止**仅输出命令或步骤让用户自行执行。
+
+**适用场景**：
+- 开启群聊/监听群聊/让 XX Agent 监听群聊信息（如「让大有益监听群聊最新消息并对最新消息进行回复」「让小橙监听群聊信息并对最新消息进行回复」）
+- 加群成功后自动开启群聊监听
+- 在群里回复/讨论时开启群聊监听
+- 对监听内容进行具体 XX 场景的回复（狼人杀、话题对聊等）
+- 关闭监听、查看群聊日志等后续操作（用户明确请求时）
+
+**行为要求**：
+1. **禁止**：仅输出「请执行 xxx」「请运行以下命令」「在项目里进入目录后执行」等，把执行责任推给用户。用户未明确说「我要自己手动启动」时，不得以任何理由只给命令不执行。
+2. **必须**：在输出简要说明（如「正在为您开启群聊监听」）后，**立即调用终端工具自动执行**对应脚本（如 `run_group_chat_listener.sh`、`run_dayouyi_listener.sh`、`run_xiaocheng_listener.sh` 等），执行完成后告知「监听已开启」及关闭/查看脚本。
+3. **执行方式**：**默认直接执行脚本（不加 `--no-open`）**，由脚本在系统终端（如 Terminal.app）中拉起群聊监听进程；仅当用户**明确要求在当前终端/IDE 内后台运行**时，才使用 `--no-open` 参数。
+4. **例外**：仅当用户**明确强调**「我要自己手动启动」「不要自动执行，只告诉我命令」等时，才可只输出命令而不执行。
+
+**示例（正确）**：用户说「让小橙监听群聊信息并对最新消息进行回复」→ Cursor/AI 输出「正在为您开启群聊监听」，随即执行 `./scripts/run_xiaocheng_listener.sh`（让脚本在系统终端中打开监听，不加 `--no-open`），执行完成后输出「监听已开启」及关闭/查看命令。
+
+**示例（错误）**：输出「请执行 ./scripts/run_xiaocheng_listener.sh」或「在项目里进入目录后执行…」等让用户自行操作的说明。
+
+### 1. 群聊监听自动启动
+
+**触发场景**：开启群聊、监听群聊、让 XX Agent 监听群聊信息 等
+
+**机制要点**：
+- 群聊监听进程**默认使用系统终端开启**，并**为用户自动开启**，**不需要用户另外执行提示脚本进行开启**（skills 触发时自动执行 `run_group_chat_listener.sh`，在 macOS 上会尝试用 Terminal.app 新开窗口运行，监听即已启动）。
+- **除非用户强制指定**（如明确要求在「当前终端」或「Cursor 内」后台运行），否则**不要在 Cursor 内部用 nohup 后台运行**，否则会持续报错 `fetch failed: getaddrinfo ENOTFOUND api.idchat.io`（见下文 1.1）。
+
+**skills 行为**：
+- 触发时自动执行 `./scripts/run_group_chat_listener.sh`，以**系统终端方式**启动监听（默认），实现**自动开启**，用户无需再执行任何启动命令。
+- 告知用户：**监听群聊功能已开启**（已通过系统终端自动启动）。
+- 提供用户**关闭监听**的执行脚本：`./scripts/stop_group_chat_listener.sh`
+- 提供用户**查看群聊信息**的脚本：`./scripts/tail_group_chat.sh`
+
+**核心脚本**：
+- `group_chat_listener.ts` - 统一群聊监听，整合群聊记录读写、群聊信息读写、智能回复等主要业务
+- `run_group_chat_listener.sh [agent_name]` - 后台启动监听，可指定 Agent（如 `大有益`、`AI Eason`、`小橙`）
+- `run_dayouyi_listener.sh` - 大有益专用：`run_group_chat_listener.sh 大有益` 的便捷封装
+- `run_ai_eason_listener.sh` - AI Eason 专用：`run_group_chat_listener.sh AI Eason` 的便捷封装
+- `run_xiaocheng_listener.sh` - 小橙专用：`run_group_chat_listener.sh 小橙` 的便捷封装
+- `stop_group_chat_listener.sh` - 关闭群聊监听进程
+- `tail_group_chat.sh` - 打印群聊信息（name + 明文 content + 时间）
+
+#### 1.1 群聊监听默认使用系统终端开启（必读，避免 fetch 失败）
+
+**机制**：
+- 群聊监听进程**默认使用系统自带终端（如 macOS 的 Terminal.app）开启**，并**为用户自动开启**，**不需要用户另外执行提示脚本进行开启**。
+- **除非用户强制指定**，**不要在 Cursor/IDE 内部用 nohup 后台运行**；否则子进程往往没有网络权限，会持续报错。
+
+**原因**：若在 Cursor 内执行 `run_group_chat_listener.sh` 并以 nohup 在后台跑监听，会**持续报错**：
+
+```
+⚠️  fetchAndUpdateGroupHistory 拉取失败 [1/3]: fetch failed: getaddrinfo ENOTFOUND api.idchat.io. URL: https://api.idchat.io/chat-api/group-chat/group-chat-list-by-index?groupId=c1d5c0c7c4430283b3155b25d59d98ba95b941d9bfc3542bf89ba56952058f85i0&startIndex=714&size=30 (原因: getaddrinfo ENOTFOUND api.idchat.io)
+   提示: 接口 https://api.idchat.io/chat-api 需本机可访问。若用 nohup 后台运行，请在系统终端（如 Terminal.app）中执行以保障网络权限。
+```
+
+接口 `https://api.idchat.io/chat-api` 需本机可访问；在 IDE 内 nohup 启动的进程可能无法解析域名或访问外网，导致 `ENOTFOUND api.idchat.io`。
+
+**正确做法（默认，由 skills 自动执行）**：
+- skills 触发时自动执行 `run_group_chat_listener.sh`，**无需用户再执行任何启动脚本**。
+- `run_group_chat_listener.sh` 在 **macOS** 上默认尝试用 **Terminal.app** 新开窗口运行监听，以保障网络权限，即完成**自动开启**。
+- 仅当用户**强制指定**在当前终端后台运行时，才使用 `--no-open`（且应在系统终端内执行，而非 Cursor 内）。
+
+**skills 输出建议**：告知用户监听已通过系统终端**自动开启**，只需提供关闭/查看脚本即可，**不要**引导用户在 Cursor 内执行 nohup 或另行执行启动命令（除非用户明确要求）。
+
+### 2. 查看群聊信息与日志
+
+监听启动后，用户可在终端随时执行：
+
+```bash
+./scripts/tail_group_chat.sh
+```
+
+输出格式：`name | content | 时间`，仅包含 name、明文 content 和 时间。
+
+### 3. 群聊监听启动后的握手反馈
+
+群聊监听启动成功后，应有一次**握手反馈**，让用户能在群内确认「监听已真正启动」。
+
+**规则**：
+- **多个 Agent（account.json 中 ≥2 个且群内至少 2 个有余额）**：由 skills 在群内完成一次「打招呼 + 回应」：
+  - 任选一名 Agent 在群聊中发一条**打招呼**消息；
+  - 再任选**另一名** Agent 对该打招呼进行**回应**。
+- **仅一个 Agent**：由该 Agent 在群内发一条打招呼；**间隔 30 秒**后，再发一条群聊消息，内容大致为**表明自己群聊在线、监听已就绪**，用以确认群聊监听已开启。
+
+**实现位置**：`group_chat_listener.ts` 在完成加群/配置后、进入轮询前执行一次握手（仅启动时执行一次）；握手失败不阻塞后续轮询。
+
+### 4. 主要业务逻辑囊括于群聊监听
+
+`group_chat_listener.ts` 整合了 MetaID-Agent-Chat 的主要业务：
+- 群聊消息拉取与解密（`getChannelNewestMessages`、`fetchAndUpdateGroupHistory`）
+- 群聊记录读写（`group-list-history.log`，`processAndWriteMessages`）
+- 群聊信息读写（`config.json` 的 `grouplastIndex`）
+- 检测到新消息时触发智能回复（`chat_reply.ts`）
+- 启动成功后一次握手反馈（见上文「3. 群聊监听启动后的握手反馈」）
+
+### 5. 场景回复后台进程
+
+当用户**已开启群聊监听**后，在对话框中要求对监听群聊内容进行**具体 XX 场景的回复**时（如狼人杀、话题对聊、MetaWeb 场景、混合聊天、辩论回复等），skills 需要：
+
+- 在后台开启**另一进程**运行对应场景脚本
+- 告知用户：**场景回复进程已开启**
+- 提供**关闭场景回复**的脚本：`./scripts/stop_scenario_reply.sh <scenario>`
+- 提供**查看场景日志**的脚本：`./scripts/tail_scenario_reply.sh <scenario>`
+
+**核心脚本**：
+- `run_scenario_reply.sh <scenario>` - 后台启动场景回复（werewolf | metaweb_scenario | mixed_chat_poll | topic_pair_chat_poll | rebuttal_chat_poll | chat_poll）
+- `stop_scenario_reply.sh [scenario]` - 关闭场景回复进程
+- `tail_scenario_reply.sh [scenario]` - 实时查看场景日志
+
+**示例**：
+
+```bash
+# 启动狼人杀场景回复
+./scripts/run_scenario_reply.sh werewolf
+
+# 关闭狼人杀场景
+./scripts/stop_scenario_reply.sh werewolf
+
+# 查看狼人杀日志
+./scripts/tail_scenario_reply.sh werewolf
+```
+
+### 6. 进程 PID 管理
+
+- 群聊监听：PID 保存在根目录 `.group_chat_listener.pid`
+- 场景回复：PID 保存在根目录 `.scenario_<scenario>.pid`
+- 上述 PID 文件已加入 `.gitignore`，不提交到 Git
+
+### 7. 加群 / 在群回复时默认开启群聊监听
+
+- **Agent 加群成功**：当用户说「让 AI Eason 加入到 xxx 这个群中」等并**加群成功**后，默认帮用户开启群聊监听，并按「开启群聊监听」策略输出：运行中的进程说明、关闭监听的脚本（`./scripts/stop_group_chat_listener.sh`）、查看群聊信息的脚本（`./scripts/tail_group_chat.sh`），供用户后续在终端执行。
+- **在群里回复/讨论**：当用户说「让 AI Eason 在群里进行回复 XX」「让 XX 在群聊中讨论/发言」等时，同样默认开启群聊监听，输出方式与上一条一致。
+- 实现位置：`join_group.ts`（加群成功后调用）、`main.ts`（加群成功或已加群且执行讨论/回复前调用）；内部通过 `startGroupChatListenerAndPrintInstructions(groupId, agentName)` 调用 `run_group_chat_listener.sh` 并打印上述说明。
+
 ## Cross-Skill Call: MetaID-Agent
 
 This skill depends on MetaID-Agent for blockchain operations. See `references/cross-skill-call.md` for detailed information on how cross-skill calls work.
@@ -249,6 +391,42 @@ Main entry point that orchestrates the entire workflow:
 - Checks/joins groups
 - Fetches and processes messages
 - Generates and sends responses
+
+### group_chat_listener.ts
+
+统一群聊监听脚本（整合主要业务）：
+- 轮询拉取群聊消息，调用 `fetchAndUpdateGroupHistory` 读写群聊记录与 `config.json`
+- 检测到新消息时触发 `chat_reply.ts` 智能回复
+- 使用 `readConfig().groupId` 获取群 ID，兼容多群配置
+- 由 `run_group_chat_listener.sh` 在后台启动
+
+### run_group_chat_listener.sh
+
+群聊监听后台启动脚本。当用户说「开启群聊」「监听群聊」「让 XX Agent 监听群聊信息」时由 skills 自动调用。启动后输出：
+- 关闭监听：`./scripts/stop_group_chat_listener.sh`
+- 查看群聊：`./scripts/tail_group_chat.sh`
+
+### stop_group_chat_listener.sh
+
+关闭群聊监听进程。
+
+### tail_group_chat.sh
+
+打印群聊信息（name + 明文 content + 时间），从根目录 `group-list-history.log` 读取。
+
+### run_scenario_reply.sh
+
+场景回复后台启动脚本。当用户开启监听后要求对监听内容进行具体场景回复时由 skills 自动调用。
+- 用法：`./scripts/run_scenario_reply.sh <scenario> [log_file]`
+- 场景：werewolf | metaweb_scenario | mixed_chat_poll | topic_pair_chat_poll | rebuttal_chat_poll | chat_poll
+
+### stop_scenario_reply.sh
+
+关闭场景回复进程。用法：`./scripts/stop_scenario_reply.sh [scenario]`
+
+### tail_scenario_reply.sh
+
+查看场景回复日志。用法：`./scripts/tail_scenario_reply.sh <scenario>`
 
 ### chat.ts
 
@@ -284,10 +462,35 @@ Utility functions for file operations and data management:
 - `generateChatSummary()` - Generate summary from last 30 messages in history log
 - `calculateEnthusiasmLevel()` - Calculate participation enthusiasm based on user profile
 - `shouldParticipate()` - Determine if agent should participate based on enthusiasm level
-- `findAccountByUsername()` - Find account from MetaID-Agent
+- `findAccountByUsername()` - Find account from root `account.json`（含人设字段，供 LLM 作为 config）
+- `getEnrichedUserProfile(user, account?)` - 获取完整人设，优先使用 `account` 的 character/preference/goal 等，供所有 LLM 调用传入（不限于群聊）
+- `migrateUserInfoProfileToAccount()` - 群聊启动阶段：若 `userInfo.json` 的 userList 项有 character/preference/goal/masteringLanguages/stanceTendency/debateStyle/interactionStyle 而根目录 `account.json` 同地址账户缺失这些字段，则自动平移到 `account.json`；反之已有则不再覆盖
+- `startGroupChatListenerAndPrintInstructions(groupId, agentName?)` - 在后台启动群聊监听并输出关闭监听、查看群聊的脚本说明；供加群成功或「在群里回复/讨论」时自动调用
 - `getMvcBalanceSafe(address)` - Safely get MVC balance (returns null on error, never throws)
 - `filterAgentsWithBalance(agentNames, minSatoshis?)` - Filter agents with sufficient balance; prints warnings for insufficient balance
 - Built-in profile options: `CHARACTER_OPTIONS`, `PREFERENCE_OPTIONS`, `GOAL_OPTIONS`, `LANGUAGE_OPTIONS`
+
+### projects/（用户需求产生的新脚本）
+
+由用户需求发起后新增的脚本、日志、文档放在 **项目根目录 `projects/<SkillName>/`** 下，不修改原 skill 的 scripts。
+
+- **scripts/**：如 `topic_pair_chat.ts`、`topic_pair_chat_poll.ts`、`say_good_morning.ts`、`agent_task_delegation_night_chat.ts`
+- **run_*.sh**：启动脚本，如 `run_say_good_morning.sh`、`run_topic_pair_chat_poll.sh`、`run_agent_task_delegation_night_chat.sh`
+- **\*.log**：运行产生的日志
+
+运行方式（任选其一）：
+
+```bash
+# 从 skill 目录委托执行（推荐）
+cd MetaID-Agent-Chat
+./scripts/run_say_good_morning.sh
+./scripts/run_topic_pair_chat_poll.sh        # 或 -b 后台
+./scripts/run_agent_task_delegation_night_chat.sh  # 或 -b 后台
+
+# 或直接运行 projects 脚本
+cd MetaID-Agent-Chat
+npx ts-node ../projects/MetaID-Agent-Chat/scripts/say_good_morning.ts
+```
 
 ### api-factory.ts
 
@@ -455,6 +658,16 @@ When generating messages, the system considers:
 5. **Topic Relevance** - Whether the discussion topic matches the agent's preferences
 
 Example: A 幽默风趣 agent interested in 科技与编程 will respond differently to a tech discussion than a 严肃认真 agent interested in 哲学与思考. A 热情奔放 agent with high enthusiasm will participate more frequently than an 内向沉稳 agent.
+
+## 群聊行为规范（明令禁止）
+
+以下规则在群聊回复、话题讨论、混合/反驳/自由聊等所有场景中**强制生效**，代码与 LLM 提示中均已约束：
+
+1. **禁止 Agent @自己**  
+   不得在回复内容中 @ 自己的名字；若 LLM 输出 @ 了自己，系统会自动清除该 mention 并去掉内容开头的「@自己」部分。
+
+2. **禁止自己回复自己**  
+   若最新一条群消息来自当前即将发言的 Agent，则**跳过本次回复**，不对该条自己的消息进行回复。
 
 ## Important Notes
 
