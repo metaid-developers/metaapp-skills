@@ -18,7 +18,7 @@ import {
   filterAgentsWithBalance,
 } from './utils'
 import { joinChannel } from './message'
-import { generateLLMResponse, LLMConfig } from './llm'
+import { generateLLMResponse, getResolvedLLMConfig, LLMConfig } from './llm'
 
 let createPin: any = null
 try {
@@ -80,19 +80,6 @@ function shuffle<T>(arr: T[]): T[] {
     [a[i], a[j]] = [a[j], a[i]]
   }
   return a
-}
-
-function getLLMConfig(): Partial<LLMConfig> {
-  const config = readConfig()
-  const apiKey = process.env.DEEPSEEK_API_KEY || config?.llm?.apiKey
-  return {
-    provider: 'deepseek',
-    apiKey,
-    baseUrl: config?.llm?.baseUrl || 'https://api.deepseek.com',
-    model: 'deepseek-chat',
-    temperature: 0.7,
-    maxTokens: 150,
-  }
 }
 
 async function hostSend(message: string): Promise<void> {
@@ -562,9 +549,10 @@ async function runPostGameDiscussion(
 async function main() {
   console.log('🐺 狼人杀 5 局游戏开始\n')
 
-  const llmConfig = getLLMConfig()
+  const config = readConfig()
+  const llmConfig = getResolvedLLMConfig(undefined, config)
   if (!llmConfig.apiKey) {
-    console.error('❌ 请配置 DEEPSEEK_API_KEY 或 config.json 中的 llm.apiKey')
+    console.error('❌ 请配置 .env 中 LLM API Key 或 account.json/config.json llm')
     process.exit(1)
   }
 

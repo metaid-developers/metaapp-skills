@@ -9,6 +9,7 @@
  */
 
 import * as path from 'path'
+import { getResolvedLLMConfig, generateChatReply, generateRebuttalReply } from './llm'
 import { sendTextForChat, getMention } from './message'
 import {
   readConfig,
@@ -28,7 +29,6 @@ import {
   getGoodnightMessage,
   stripLeadingSelfMention,
 } from './utils'
-import { generateChatReply, generateRebuttalReply } from './llm'
 import { joinChannel } from './message'
 
 let createPin: any = null
@@ -44,17 +44,6 @@ const GROUP_ID = 'c1d5c0c7c4430283b3155b25d59d98ba95b941d9bfc3542bf89ba56952058f
 const REBUTTAL_AGENTS = ['小橙', 'Nova', '墨白']
 const NORMAL_AGENTS = ['肥猪王', 'AI Eason', 'AI Bear', '大有益', 'Chloé', 'Satō']
 const METAID_AGENT_KEYWORDS = ['MetaID-Agent', 'MetaID Agent', 'metaid-agent', 'MetaIDAgent']
-
-function getLLMConfig(config: any) {
-  return {
-    provider: 'deepseek' as const,
-    apiKey: process.env.DEEPSEEK_API_KEY || config?.llm?.apiKey,
-    baseUrl: config?.llm?.baseUrl || 'https://api.deepseek.com',
-    model: config?.llm?.model === 'DeepSeek-V3.2' ? 'deepseek-chat' : (config?.llm?.model || 'deepseek-chat'),
-    temperature: 0.9,
-    maxTokens: 200,
-  }
-}
 
 function escapeRegExp(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -88,9 +77,9 @@ async function main() {
   config.groupId = GROUP_ID
   writeConfig(config)
 
-  const llmConfig = getLLMConfig(config)
-  if (!llmConfig.apiKey) {
-    console.error('❌ 请配置 DEEPSEEK_API_KEY 或 config.json llm.apiKey')
+  const defaultLlm = getResolvedLLMConfig(undefined, config)
+  if (!defaultLlm.apiKey) {
+    console.error('❌ 请配置 .env 中 LLM API Key 或 account.json/config.json llm')
     process.exit(1)
   }
 
@@ -142,6 +131,8 @@ async function main() {
     console.error(`❌ 未找到账户: ${agentName}`)
     process.exit(1)
   }
+
+  const llmConfig = getResolvedLLMConfig(account, config)
 
   if (!hasJoinedGroup(account.mvcAddress, GROUP_ID)) {
     const joinResult = await joinChannel(GROUP_ID, account.mnemonic, createPin)

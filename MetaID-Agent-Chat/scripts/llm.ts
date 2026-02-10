@@ -2,11 +2,14 @@
 
 /**
  * LLM Integration Module
- * Supports OpenAI, Claude, and Deepseek API for generating intelligent, context-aware responses
+ * Supports Deepseek, OpenAI, Claude, Gemini for generating intelligent, context-aware responses.
+ * 配置解析优先级：account.json 的 accountList[].llm > config.json/ .env 默认配置。
  */
 
+import { getEnv } from './env-config'
+
 export interface LLMConfig {
-  provider: 'openai' | 'claude' | 'deepseek' | 'custom'
+  provider: 'openai' | 'claude' | 'deepseek' | 'gemini' | 'custom'
   apiKey?: string
   baseUrl?: string
   model?: string
@@ -28,13 +31,97 @@ export interface LLMResponse {
   }
 }
 
-// 默认配置（不含 apiKey，apiKey 必须从 .env 或 config 传入）
+// 默认配置（不含 apiKey，apiKey 必须从 .env、config 或 account 传入）
 const DEFAULT_CONFIG: Partial<LLMConfig> = {
   provider: 'deepseek',
   model: 'DeepSeek-V3.2',
   baseUrl: 'https://api.deepseek.com',
   temperature: 0.8,
-  maxTokens: 500,
+  maxTokens: 6000,
+}
+
+/** 按 provider 从 env 取 API Key（与 env-config 的 configFromEnv 一致） */
+function getApiKeyFromEnv(provider: string, env?: Record<string, string>): string {
+  const e = env ?? getEnv()
+  return (
+    e.LLM_API_KEY ||
+    e.DEEPSEEK_API_KEY ||
+    e.OPENAI_API_KEY ||
+    e.CLAUDE_API_KEY ||
+    e.GEMINI_API_KEY ||
+    ''
+  )
+}
+
+/** 按 provider 取默认模型名 */
+function defaultModel(provider: string): string {
+  switch (provider) {
+    case 'gemini':
+      return 'gemini-2.0-flash'
+    case 'openai':
+      return 'gpt-4o-mini'
+    case 'claude':
+      return 'claude-3-5-sonnet-20241022'
+    default:
+      return 'deepseek-chat'
+  }
+}
+
+/** 标准化模型名（用于兼容 config 中写的 DeepSeek-V3.2 等） */
+function normalizeModel(provider: string, model?: string): string {
+  if (!model) return defaultModel(provider)
+  if (provider === 'deepseek' && (model === 'DeepSeek-V3.2' || model === 'DeepSeek-V3')) return 'deepseek-chat'
+  return model
+}
+
+export type ResolvedLLMConfig = Partial<LLMConfig>
+
+/**
+ * 解析最终使用的 LLM 配置（供 generateLLMResponse 等使用）
+ * 优先级：account.json 的 accountList[].llm（且含 apiKey）> config.json / .env 默认配置
+ * @param account 当前账户（如 findAccountByUsername 的返回值），若有 llm 且带 apiKey 则优先使用
+ * @param config 全局 config（如 readConfig()），其 llm 已由 normalizeConfig 合并过 .env 的 apiKey
+ */
+export function getResolvedLLMConfig(
+  account?: { llm?: unknown } | null,
+  config?: { llm?: Partial<LLMConfig> }
+): ResolvedLLMConfig {
+  const accountLlmRaw = account?.llm
+  const accountLlm =
+    accountLlmRaw != null
+      ? (Array.isArray(accountLlmRaw) ? (accountLlmRaw as Partial<LLMConfig>[])[0] : (accountLlmRaw as Partial<LLMConfig>))
+      : undefined
+  const hasAccountLlm = accountLlm?.apiKey != null && String(accountLlm.apiKey).trim() !== ''
+  const base = config?.llm ?? {}
+
+  const provider = (hasAccountLlm ? accountLlm!.provider : base.provider) || 'deepseek'
+  const prov = provider as LLMConfig['provider']
+  const apiKey = hasAccountLlm
+    ? accountLlm!.apiKey
+    : (base.apiKey || getApiKeyFromEnv(provider))
+  const model = hasAccountLlm
+    ? normalizeModel(provider, accountLlm!.model)
+    : normalizeModel(provider, base.model) || defaultModel(provider)
+  const baseUrl =
+    (hasAccountLlm ? accountLlm!.baseUrl : base.baseUrl) ||
+    (provider === 'gemini'
+      ? 'https://generativelanguage.googleapis.com'
+      : provider === 'deepseek'
+        ? 'https://api.deepseek.com'
+        : provider === 'openai'
+          ? 'https://api.openai.com/v1'
+          : provider === 'claude'
+            ? 'https://api.anthropic.com/v1'
+            : undefined)
+
+  return {
+    provider: prov,
+    apiKey,
+    baseUrl,
+    model,
+    temperature: hasAccountLlm ? accountLlm!.temperature : base.temperature,
+    maxTokens: hasAccountLlm ? accountLlm!.maxTokens : base.maxTokens,
+  }
 }
 
 /**
@@ -49,7 +136,7 @@ export async function generateLLMResponse(
   // Check if API key is provided
   if (!finalConfig.apiKey) {
     throw new Error(
-      'LLM API key not configured. Please set DEEPSEEK_API_KEY, OPENAI_API_KEY or CLAUDE_API_KEY environment variable, or configure in config.json'
+      'LLM API key not configured. Please set DEEPSEEK_API_KEY, OPENAI_API_KEY, CLAUDE_API_KEY or GEMINI_API_KEY in .env, or configure in account.json / config.json'
     )
   }
 
@@ -60,6 +147,8 @@ export async function generateLLMResponse(
       return await callOpenAI(messages, finalConfig)
     case 'claude':
       return await callClaude(messages, finalConfig)
+    case 'gemini':
+      return await callGemini(messages, finalConfig)
     default:
       throw new Error(`Unsupported LLM provider: ${finalConfig.provider}`)
   }
@@ -210,6 +299,66 @@ async function callClaude(
           promptTokens: data.usage.input_tokens,
           completionTokens: data.usage.output_tokens,
           totalTokens: data.usage.input_tokens + data.usage.output_tokens,
+        }
+      : undefined,
+  }
+}
+
+/**
+ * Call Google Gemini API (Generative Language API)
+ * 默认模型：gemini-2.0-flash（对应「Gemini 3 Flash」等命名，可经 LLM_MODEL 覆盖）
+ */
+async function callGemini(
+  messages: LLMMessage[],
+  config: LLMConfig
+): Promise<LLMResponse> {
+  const baseUrl = config.baseUrl || 'https://generativelanguage.googleapis.com'
+  const model = config.model || 'gemini-2.0-flash'
+  const apiKey = config.apiKey!
+
+  const systemMessage = messages.find((m) => m.role === 'system')?.content || ''
+  const conversationMessages = messages.filter((m) => m.role !== 'system')
+
+  const contents: { role: string; parts: { text: string }[] }[] = []
+  for (const msg of conversationMessages) {
+    const role = msg.role === 'assistant' ? 'model' : 'user'
+    contents.push({ role, parts: [{ text: msg.content }] })
+  }
+
+  const body: Record<string, unknown> = {
+    contents,
+    generationConfig: {
+      temperature: config.temperature ?? 0.8,
+      maxOutputTokens: config.maxTokens ?? 500,
+    },
+  }
+  if (systemMessage) {
+    body.systemInstruction = { parts: [{ text: systemMessage }] }
+  }
+
+  const url = `${baseUrl.replace(/\/$/, '')}/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  
+  if (!response.ok) {
+    const errorText = await response.text()
+    throw new Error(`Gemini API error: ${response.status} ${errorText}`)
+  }
+
+  const data = await response.json()
+
+  const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? ''
+  const usage = data.usageMetadata
+  return {
+    content: text,
+    usage: usage
+      ? {
+          promptTokens: usage.promptTokenCount,
+          completionTokens: usage.candidatesTokenCount,
+          totalTokens: usage.totalTokenCount,
         }
       : undefined,
   }

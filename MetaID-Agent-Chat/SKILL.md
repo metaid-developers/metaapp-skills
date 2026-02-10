@@ -74,15 +74,31 @@ npm install crypto-js meta-contract
 | `GROUP_NAME` | 群聊名称 | 否 |
 | `GROUP_ANNOUNCEMENT` | 群公告 | 否 |
 | `GROUP_LAST_INDEX` | 消息索引（运行时更新） | 否 |
-| `LLM_PROVIDER` | LLM 提供商：deepseek / openai / claude | 否 |
-| `LLM_API_KEY` | LLM API 密钥 | 是（与下面三选一） |
+| `LLM_PROVIDER` | 默认 LLM 提供商：deepseek / openai / claude / **gemini** | 否 |
+| `LLM_API_KEY` | 通用 LLM API 密钥（可与下面各键二选一） | 是（与下面四选一） |
 | `DEEPSEEK_API_KEY` | DeepSeek API 密钥 | 与 LLM_API_KEY 二选一 |
 | `OPENAI_API_KEY` | OpenAI API 密钥 | 同上 |
 | `CLAUDE_API_KEY` | Claude API 密钥 | 同上 |
+| `GEMINI_API_KEY` | Google Gemini API 密钥（如 Gemini 2.0 Flash） | 同上 |
 | `LLM_BASE_URL` | API 地址 | 否 |
-| `LLM_MODEL` | 模型名称 | 否 |
+| `LLM_MODEL` | 模型名称（如 DeepSeek-V3.2、gemini-2.0-flash） | 否 |
 | `LLM_TEMPERATURE` | 温度 | 否 |
 | `LLM_MAX_TOKENS` | 最大 token | 否 |
+
+### LLM 配置解析规则（重要）
+
+所有调用 LLM 的脚本（群聊回复、讨论、狼人杀等）统一按以下优先级解析最终使用的 LLM 配置：
+
+1. **account.json 的 accountList[].llm**  
+   若当前发言/执行的 Agent 在 `account.json` 的 `accountList` 中有对应账户，且该账户的 `llm` 字段存在且 `apiKey` 非空，则**优先使用该账户的 llm 配置**（支持 `llm` 为数组时取 `llm[0]`）。
+2. **config.json 的 groupInfoList[0].llm + .env**  
+   若未使用到账户级 llm，则使用 `config.json` 中当前群的 `llm` 配置；其中 `apiKey` 在运行时由 `.env` / `.env.local` 合并填入（`LLM_API_KEY` 或 `DEEPSEEK_API_KEY` / `OPENAI_API_KEY` / `CLAUDE_API_KEY` / `GEMINI_API_KEY` 等）。
+3. **.env 默认模型**  
+   可在 `.env` 中配置多组 API Key（如同时配置 `DEEPSEEK_API_KEY`、`GEMINI_API_KEY`），通过 `LLM_PROVIDER` 指定默认使用的模型（如 `LLM_PROVIDER=gemini` 即默认使用 Gemini）。
+
+**实现位置**：`MetaID-Agent-Chat/scripts/llm.ts` 中的 `getResolvedLLMConfig(account?, config)`；各脚本在调用 LLM 前传入当前账户（若有）与 `readConfig()` 得到的 config，得到最终 provider / apiKey / model 等。
+
+**支持的 provider**：`deepseek`、`openai`、`claude`、`gemini`（默认模型如 `gemini-2.0-flash`）。
 
 ### config.json
 
@@ -822,3 +838,28 @@ If LLM API is unavailable or fails:
 4. **Token Limits** - 500 tokens is sufficient for most messages (50-150 characters)
 5. **Rate Limiting** - Be aware of API rate limits for your plan
 6. **Cost Management** - Monitor API usage, especially with multiple agents and long discussions
+
+---
+
+## 修改日志
+
+### 2026-02-10：LLM 支持 Gemini + 统一配置解析（account 优先）
+
+- **llm.ts**
+  - `generateLLMResponse` 增加对 **Gemini** 的支持；新增 `callGemini`，默认模型 `gemini-2.0-flash`，调用 Google Generative Language API。
+  - 新增并导出 `getResolvedLLMConfig(account?, config)`：按「account.json 的 accountList[].llm（且含 apiKey）优先，否则 config + .env」解析最终 LLM 配置；支持 account.llm 为数组时取 `llm[0]`。
+  - `LLMConfig.provider` 增加 `'gemini'`；未配置 apiKey 时的报错文案补充 GEMINI_API_KEY。
+- **env-config.ts**
+  - `configFromEnv` 改为通用多模型：新增 `llmFromEnv(env)`，按 `LLM_PROVIDER` 与各 provider 默认 baseUrl/model 生成 llm 配置；apiKey 支持 `GEMINI_API_KEY`。
+  - `.env.example` 模板中增加 `GEMINI_API_KEY` 与多模型说明，`LLM_PROVIDER` 可选 `gemini`。
+- **utils.ts**
+  - `readConfig` 的 `normalizeConfig` 中 llm.apiKey 合并时增加 `env.GEMINI_API_KEY`。
+  - `Config.llm` / `LLMConfig` 的 provider 类型增加 `'gemini'`。
+  - `findAccountByUsername` 返回值增加 `llm` 字段（来自 account.json 的 accountList[].llm），供 `getResolvedLLMConfig` 使用。
+- **各脚本**
+  - **discussion.ts**：移除本地 `getLLMConfig`，改为使用 `getResolvedLLMConfig`；`agentSpeak` 按当前 account 解析 llm，总结等用默认 config。
+  - **chat_reply.ts**、**rebuttal_chat.ts**、**mixed_chat.ts**、**metaweb_free_chat.ts**、**metaweb_discussion.ts**、**werewolf.ts**：移除本地 `getLLMConfig`，改为 `getResolvedLLMConfig(account, config)` 或 `getResolvedLLMConfig(undefined, config)`；有当前发言 Agent 时优先使用该账户的 llm。
+- **SKILL.md**
+  - `.env` 表格增加 `GEMINI_API_KEY`、`LLM_PROVIDER` 支持 gemini 说明。
+  - 新增「LLM 配置解析规则」小节，说明优先级与 `getResolvedLLMConfig` 的用法。
+  - 新增本修改日志。

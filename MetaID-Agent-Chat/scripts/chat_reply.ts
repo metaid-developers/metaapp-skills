@@ -29,7 +29,7 @@ import {
   getGoodnightMessage,
   stripLeadingSelfMention,
 } from './utils'
-import { generateChatReply } from './llm'
+import { generateChatReply, getResolvedLLMConfig } from './llm'
 import { joinChannel } from './message'
 
 let createPin: any = null
@@ -44,17 +44,6 @@ try {
 /** 默认群 ID，优先使用 readConfig().groupId */
 const DEFAULT_GROUP_ID = 'c1d5c0c7c4430283b3155b25d59d98ba95b941d9bfc3542bf89ba56952058f85i0'
 const METAID_AGENT_KEYWORDS = ['MetaID-Agent', 'MetaID Agent', 'metaid-agent', 'MetaIDAgent']
-
-function getLLMConfig(config: any) {
-  return {
-    provider: 'deepseek' as const,
-    apiKey: process.env.DEEPSEEK_API_KEY || config?.llm?.apiKey,
-    baseUrl: config?.llm?.baseUrl || 'https://api.deepseek.com',
-    model: config?.llm?.model === 'DeepSeek-V3.2' ? 'deepseek-chat' : (config?.llm?.model || 'deepseek-chat'),
-    temperature: 0.85,
-    maxTokens: 200,
-  }
-}
 
 function containsMetaIDAgent(text: string): boolean {
   const lower = (text || '').toLowerCase()
@@ -94,9 +83,9 @@ async function main() {
   config.groupId = GROUP_ID
   writeConfig(config)
 
-  const llmConfig = getLLMConfig(config)
-  if (!llmConfig.apiKey) {
-    console.error('❌ 请配置 DEEPSEEK_API_KEY 或 config.json llm.apiKey')
+  const defaultLlm = getResolvedLLMConfig(undefined, config)
+  if (!defaultLlm.apiKey) {
+    console.error('❌ 请配置 .env 中 DEEPSEEK_API_KEY / GEMINI_API_KEY 等或 account.json/config.json llm')
     process.exit(1)
   }
 
@@ -169,6 +158,8 @@ async function main() {
     console.error(`❌ 未找到账户: ${agentName}`)
     process.exit(1)
   }
+
+  const llmConfig = getResolvedLLMConfig(account, config)
 
   // 禁止自己回复自己：若最新一条消息来自本 Agent，跳过本次回复
   if (entries.length > 0) {

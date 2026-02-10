@@ -13,6 +13,7 @@ import {
   writeAccountFile,
   ensureAccountFile,
   Account,
+  AccountProfile,
   readUserInfoFile,
   writeUserInfoFile,
   getAvatarUrl,
@@ -41,7 +42,12 @@ function syncMetaIdToFiles(mvcAddress: string, metaId: string): void {
   }
 }
 
-async function createAgent(username: string): Promise<void> {
+/**
+ * 创建单个 MetaID Agent
+ * @param username 用户名（链上 name 节点）
+ * @param profileOverrides 可选人设覆盖，未传则随机分配
+ */
+export async function createAgent(username: string, profileOverrides?: Partial<AccountProfile>): Promise<void> {
   console.log(`\n🚀 开始创建 MetaID Agent: ${username}`)
   console.log('='.repeat(50))
 
@@ -175,7 +181,7 @@ async function createAgent(username: string): Promise<void> {
         } else {
           console.log('⚠️  暂时无法获取 globalMetaId，但用户名已更新')
         }
-        applyProfileToAccount(accountData.accountList[accountIndex], undefined)
+        applyProfileToAccount(accountData.accountList[accountIndex], profileOverrides)
         console.log(`✅ 已写入 Agent 人设到 account.json`)
         writeAccountFile(accountData)
       }

@@ -24,6 +24,7 @@ import {
   generateDiscussionMessage,
   shouldParticipateNow,
   calculateThinkingTime,
+  getResolvedLLMConfig,
   LLMConfig,
 } from './llm'
 import { getMention } from './message'
@@ -53,37 +54,6 @@ interface DiscussionState {
   targetMessages: number
   currentRound: number
   agentIndex: number
-}
-
-/**
- * Get LLM config from environment or config.json
- * @param config - Config object
- * @param forceProvider - If set, force use this provider (e.g. 'deepseek')
- */
-function getLLMConfig(config: any, forceProvider?: 'deepseek' | 'openai' | 'claude'): Partial<LLMConfig> {
-  const envApiKey = process.env.DEEPSEEK_API_KEY || process.env.OPENAI_API_KEY || process.env.CLAUDE_API_KEY
-  let provider = config?.llm?.provider || 'deepseek'
-  let apiKey = config?.llm?.apiKey || envApiKey || ''
-
-  if (forceProvider === 'deepseek') {
-    provider = 'deepseek'
-    apiKey = process.env.DEEPSEEK_API_KEY || config?.llm?.apiKey || apiKey
-  } else if (!forceProvider && envApiKey) {
-    provider = process.env.DEEPSEEK_API_KEY ? 'deepseek' : process.env.OPENAI_API_KEY ? 'openai' : process.env.CLAUDE_API_KEY ? 'claude' : provider
-    apiKey = envApiKey
-  }
-
-  // DeepSeek 正确模型名: deepseek-chat
-  const model = config?.llm?.model === 'DeepSeek-V3.2' ? 'deepseek-chat' : (config?.llm?.model || 'deepseek-chat')
-
-  return {
-    provider: provider as 'deepseek' | 'openai' | 'claude',
-    apiKey,
-    baseUrl: config?.llm?.baseUrl || undefined,
-    model,
-    temperature: config?.llm?.temperature || undefined,
-    maxTokens: config?.llm?.maxTokens || undefined,
-  }
 }
 
 /**
@@ -137,7 +107,7 @@ async function agentSpeak(
   secretKeyStr: string,
   messageCount: number,
   state: DiscussionState,
-  llmConfig: Partial<LLMConfig>
+  config: { llm?: Partial<LLMConfig> }
 ): Promise<boolean> {
   try {
     // Find account
@@ -146,6 +116,8 @@ async function agentSpeak(
       console.error(`❌ Account not found for: ${agentName}`)
       return false
     }
+
+    const llmConfig = getResolvedLLMConfig(account, config)
 
     // Get user profile
     const userInfo = readUserInfo()
@@ -364,6 +336,12 @@ export interface RunDiscussionOverrides {
   targetMessages?: number
   topicAnnouncer?: string
   groupId?: string
+  /** 讨论总时长（毫秒），超时后结束讨论 */
+  maxDurationMs?: number
+  /** 过半时由主持人发送的下半场提示文案（与 maxDurationMs 搭配使用） */
+  halfTimeMessage?: string
+  /** 负责发送总结的 Agent（默认大有益） */
+  summaryAgent?: string
 }
 
 /**
@@ -388,34 +366,34 @@ export async function runDiscussion(overrides?: RunDiscussionOverrides) {
     return
   }
   const topicAnnouncer = overrides?.topicAnnouncer ?? (agents.includes('大有益') ? '大有益' : agents[0])
+  const maxDurationMs = overrides?.maxDurationMs
+  const halfTimeMessage = overrides?.halfTimeMessage
+  const summaryAgentOverride = overrides?.summaryAgent
 
   console.log('🎯 开始智能讨论任务')
-  console.log(`📋 议题: ${topic}`)
+  console.log(`📋 议题: ${topic.substring(0, 80)}${topic.length > 80 ? '...' : ''}`)
   console.log(`👥 参与者: ${agents.join(', ')}`)
   console.log(`🎯 目标: 每人最多发表${targetMessages}次见解`)
   console.log(`📢 开场: ${topicAnnouncer} 公布议题`)
-  console.log(`🤖 使用LLM: DeepSeek\n`)
+  if (maxDurationMs) console.log(`⏰ 讨论时长: ${Math.round(maxDurationMs / 60000)} 分钟，上下半场各约 ${Math.round(maxDurationMs / 120000)} 分钟`)
+  console.log(`🤖 使用 LLM: 按 account/config 解析（默认见上）\n`)
 
-  // Get LLM config
+  // Get LLM config（默认用 config/env；单次发言时按 account 优先见 getResolvedLLMConfig）
   const config = readConfig()
   config.groupId = groupId
   writeConfig(config)
 
-  const llmConfig = getLLMConfig(config, 'deepseek')
+  const defaultLlmConfig = getResolvedLLMConfig(undefined, config)
 
   // Check LLM configuration
-  if (!llmConfig.apiKey) {
+  if (!defaultLlmConfig.apiKey) {
     console.error('❌ LLM API key not configured!')
-    console.error('   请设置环境变量 DEEPSEEK_API_KEY, OPENAI_API_KEY 或 CLAUDE_API_KEY')
-    console.error('   或在 config.json 中配置 llm.apiKey')
-    console.error('\n   示例:')
-    console.error('   export DEEPSEEK_API_KEY="sk-..."')
-    console.error('   或编辑 config.json 添加:')
-    console.error('   { "llm": { "apiKey": "sk-...", "provider": "deepseek" } }')
+    console.error('   请设置 .env 中 DEEPSEEK_API_KEY / OPENAI_API_KEY / CLAUDE_API_KEY / GEMINI_API_KEY 之一')
+    console.error('   或在 account.json 的 accountList[].llm 或 config.json 中配置')
     process.exit(1)
   }
 
-  console.log(`✅ LLM配置: ${llmConfig.provider} (${llmConfig.model || 'default'})\n`)
+  console.log(`✅ LLM 默认: ${defaultLlmConfig.provider} (${defaultLlmConfig.model || 'default'})\n`)
 
   const secretKeyStr = groupId.substring(0, 16)
   const state: DiscussionState = {
@@ -491,8 +469,44 @@ export async function runDiscussion(overrides?: RunDiscussionOverrides) {
   let round = 0
   let consecutiveSkips = 0
   const maxConsecutiveSkips = agents.length * 2 // Allow some skips
+  const startTime = Date.now()
+  let halfTimeSent = false
 
   while (true) {
+    // 若设置了总时长，到点结束
+    if (maxDurationMs && Date.now() - startTime >= maxDurationMs) {
+      console.log('\n⏰ 讨论时间到，结束讨论\n')
+      break
+    }
+
+    // 下半场提示：过半时由主持人发一条
+    if (maxDurationMs && halfTimeMessage && !halfTimeSent && Date.now() - startTime >= maxDurationMs / 2) {
+      halfTimeSent = true
+      const announcerAcc = findAccountByUsername(topicAnnouncer)
+      if (announcerAcc) {
+        try {
+          const sent = await sendTextForChat(
+            groupId,
+            halfTimeMessage,
+            0,
+            secretKeyStr,
+            null,
+            [],
+            announcerAcc.userName,
+            announcerAcc.mnemonic,
+            createPin
+          )
+          if (sent.txids?.length) {
+            console.log(`\n📢 ${topicAnnouncer} 宣布下半场开始\n`)
+            await fetchAndUpdateGroupHistory(groupId, secretKeyStr)
+          }
+        } catch (e: any) {
+          console.warn('⚠️ 下半场提示发送失败:', e?.message || e)
+        }
+        await new Promise((r) => setTimeout(r, 3000))
+      }
+    }
+
     // Check if all agents reached target
     const allComplete = agents.every((agent) => (state.messagesPerAgent[agent] || 0) >= targetMessages)
 
@@ -512,8 +526,8 @@ export async function runDiscussion(overrides?: RunDiscussionOverrides) {
         continue
       }
 
-      // Agent speaks (or decides to skip)
-      const success = await agentSpeak(agentName, topic, groupId, secretKeyStr, currentCount, state, llmConfig)
+      // Agent speaks (or decides to skip)，按该 Agent 的 account.llm 优先解析配置
+      const success = await agentSpeak(agentName, topic, groupId, secretKeyStr, currentCount, state, config)
 
       if (success) {
         state.messagesPerAgent[agentName] = currentCount + 1
@@ -556,15 +570,20 @@ export async function runDiscussion(overrides?: RunDiscussionOverrides) {
     agents,
     state.messagesPerAgent,
     groupId,
-    llmConfig
+    defaultLlmConfig
   )
 
-  // Send summary as host (大有益)
-  const summaryAgent = '大有益'
+  // Send summary: 优先使用 overrides.summaryAgent，否则大有益或第一个参与者
+  const summaryAgent =
+    summaryAgentOverride && agents.includes(summaryAgentOverride)
+      ? summaryAgentOverride
+      : agents.includes('大有益')
+        ? '大有益'
+        : agents[0]
   const account = findAccountByUsername(summaryAgent)
   if (account) {
     const finalMessage = `${summary}\n\n🏆 本场讨论MVP：**${mvp}** — 论点最鲜明，感谢精彩发言！`
-    console.log(`📤 ${summaryAgent} 发送总结:\n${finalMessage}\n`)
+    console.log(`📤 ${summaryAgent} 作为主持人发送总结:\n${finalMessage}\n`)
 
     try {
       const result = await sendTextForChat(

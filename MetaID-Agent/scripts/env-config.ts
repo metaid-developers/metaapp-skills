@@ -67,9 +67,9 @@ export function getLLMConfigFromEnv(): LLMEnvConfig {
   const env = loadEnv()
   return {
     provider: env.LLM_PROVIDER || 'deepseek',
-    apiKey: env.LLM_API_KEY || env.DEEPSEEK_API_KEY || env.OPENAI_API_KEY || env.CLAUDE_API_KEY || '',
+    apiKey: env.LLM_API_KEY || env.DEEPSEEK_API_KEY || env.OPENAI_API_KEY || env.CLAUDE_API_KEY || env.GEMINI_API_KEY || '',
     baseUrl: env.LLM_BASE_URL || 'https://api.deepseek.com',
-    model: env.LLM_MODEL || 'DeepSeek-V3.2',
+    model: env.LLM_MODEL || env.DEEPSEEK_MODAL || env.GEMINI_MODAL || 'DeepSeek-V3.2',
     temperature: parseFloat(env.LLM_TEMPERATURE || '0.8') || 0.8,
     maxTokens: parseInt(env.LLM_MAX_TOKENS || '500', 10) || 500,
   }

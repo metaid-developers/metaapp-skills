@@ -70,7 +70,7 @@ function loadEnv(): Record<string, string> {
 }
 
 /**
- * 创建 .env.example 模板
+ * 创建 .env.example 模板（支持多模型：deepseek / openai / claude / gemini，由 LLM_PROVIDER 指定默认）
  */
 function createEnvExample(): void {
   const content = `# MetaID-Agent-Chat  configuration
@@ -84,13 +84,20 @@ GROUP_ANNOUNCEMENT=群公告
 # 消息索引（运行时自动更新，可不填）
 GROUP_LAST_INDEX=0
 
-# LLM 配置（必填其一）
+# LLM 默认配置（必填：以下 API Key 至少填一个，或填 LLM_API_KEY 通用键）
+# 通过 LLM_PROVIDER 指定默认模型：deepseek | openai | claude | gemini
 LLM_PROVIDER=deepseek
 LLM_API_KEY=sk-your-api-key
 LLM_BASE_URL=https://api.deepseek.com
 LLM_MODEL=DeepSeek-V3.2
 LLM_TEMPERATURE=0.8
 LLM_MAX_TOKENS=500
+
+# 各模型独立 Key（可选，不填则用上面的 LLM_API_KEY）
+# DEEPSEEK_API_KEY=sk-...
+# OPENAI_API_KEY=sk-...
+# CLAUDE_API_KEY=sk-ant-...
+# GEMINI_API_KEY=AIza...
 `
   fs.writeFileSync(ENV_EXAMPLE_FILE, content, 'utf-8')
 }
@@ -135,8 +142,42 @@ export interface GroupInfoItem {
   }
 }
 
+/** 按 provider 从 env 解析默认 llm 配置（通用：支持 deepseek / openai / claude / gemini） */
+function llmFromEnv(env: Record<string, string>): GroupInfoItem['llm'] {
+  const provider = env.LLM_PROVIDER || 'deepseek'
+  const apiKey =
+    env.LLM_API_KEY ||
+    env.DEEPSEEK_API_KEY ||
+    env.OPENAI_API_KEY ||
+    env.CLAUDE_API_KEY ||
+    env.GEMINI_API_KEY ||
+    ''
+  const defaultBaseUrl: Record<string, string> = {
+    deepseek: 'https://api.deepseek.com',
+    openai: 'https://api.openai.com/v1',
+    claude: 'https://api.anthropic.com/v1',
+    gemini: 'https://generativelanguage.googleapis.com',
+  }
+  const defaultModel: Record<string, string> = {
+    deepseek: 'DeepSeek-V3.2',
+    openai: 'gpt-4o-mini',
+    claude: 'claude-3-5-sonnet-20241022',
+    gemini: 'gemini-2.0-flash',
+  }
+  return {
+    provider,
+    apiKey,
+    baseUrl: env.LLM_BASE_URL || defaultBaseUrl[provider] || defaultBaseUrl.deepseek,
+    model: env.LLM_MODEL || defaultModel[provider] || defaultModel.deepseek,
+    temperature: parseFloat(env.LLM_TEMPERATURE || '0.8') || 0.8,
+    maxTokens: parseInt(env.LLM_MAX_TOKENS || '500', 10) || 500,
+  }
+}
+
 /**
  * 从 env 构建 config 对象（groupInfoList 格式，groupInfoList[0] 来自 .env）
+ * 通用：支持在 .env 中配置多种模型的 key（DEEPSEEK_API_KEY / OPENAI_API_KEY / CLAUDE_API_KEY / GEMINI_API_KEY），
+ * 通过 LLM_PROVIDER 指定默认使用的模型。
  */
 export function configFromEnv(env: Record<string, string>): { groupInfoList: GroupInfoItem[] } {
   const grouplastIndex = parseInt(env.GROUP_LAST_INDEX || '0', 10) || 0
@@ -145,14 +186,7 @@ export function configFromEnv(env: Record<string, string>): { groupInfoList: Gro
     groupName: env.GROUP_NAME || '',
     groupAnnouncement: env.GROUP_ANNOUNCEMENT || '',
     grouplastIndex: isNaN(grouplastIndex) ? 0 : grouplastIndex,
-    llm: {
-      provider: env.LLM_PROVIDER || 'deepseek',
-      apiKey: env.LLM_API_KEY || env.DEEPSEEK_API_KEY || env.OPENAI_API_KEY || env.CLAUDE_API_KEY || '',
-      baseUrl: env.LLM_BASE_URL || 'https://api.deepseek.com',
-      model: env.LLM_MODEL || 'DeepSeek-V3.2',
-      temperature: parseFloat(env.LLM_TEMPERATURE || '0.8') || 0.8,
-      maxTokens: parseInt(env.LLM_MAX_TOKENS || '500', 10) || 500,
-    },
+    llm: llmFromEnv(env),
   }
   return { groupInfoList: [first] }
 }

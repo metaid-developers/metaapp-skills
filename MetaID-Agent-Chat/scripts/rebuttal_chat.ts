@@ -25,7 +25,7 @@ import {
   getGoodnightMessage,
   stripLeadingSelfMention,
 } from './utils'
-import { generateRebuttalReply } from './llm'
+import { generateRebuttalReply, getResolvedLLMConfig } from './llm'
 import { joinChannel } from './message'
 
 let createPin: any = null
@@ -40,17 +40,6 @@ try {
 const GROUP_ID = 'c1d5c0c7c4430283b3155b25d59d98ba95b941d9bfc3542bf89ba56952058f85i0'
 const REBUTTAL_AGENTS = ['小橙', 'Nova', '墨白']
 
-function getLLMConfig(config: any) {
-  return {
-    provider: 'deepseek' as const,
-    apiKey: process.env.DEEPSEEK_API_KEY || config?.llm?.apiKey,
-    baseUrl: config?.llm?.baseUrl || 'https://api.deepseek.com',
-    model: config?.llm?.model === 'DeepSeek-V3.2' ? 'deepseek-chat' : (config?.llm?.model || 'deepseek-chat'),
-    temperature: 0.95,
-    maxTokens: 150,
-  }
-}
-
 function pickRandomAgent(agents: string[]): string {
   return agents[Math.floor(Math.random() * agents.length)]
 }
@@ -60,9 +49,9 @@ async function main() {
   config.groupId = GROUP_ID
   writeConfig(config)
 
-  const llmConfig = getLLMConfig(config)
-  if (!llmConfig.apiKey) {
-    console.error('❌ 请配置 DEEPSEEK_API_KEY 或 config.json llm.apiKey')
+  const defaultLlm = getResolvedLLMConfig(undefined, config)
+  if (!defaultLlm.apiKey) {
+    console.error('❌ 请配置 .env 中 LLM API Key 或 account.json/config.json llm')
     process.exit(1)
   }
 
@@ -89,6 +78,8 @@ async function main() {
     console.error(`❌ 未找到账户: ${agentName}`)
     return
   }
+
+  const llmConfig = getResolvedLLMConfig(account, config)
 
   if (!hasJoinedGroup(account.mvcAddress, GROUP_ID)) {
     const joinResult = await joinChannel(GROUP_ID, account.mnemonic, createPin)

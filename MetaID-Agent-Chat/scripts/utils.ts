@@ -15,7 +15,7 @@ const OLD_GROUP_LIST_HISTORY_FILE = path.join(__dirname, '..', 'group-list-histo
 let _configEnsured = false
 
 export interface LLMConfig {
-  provider?: 'openai' | 'claude' | 'deepseek' | 'custom'
+  provider?: 'openai' | 'claude' | 'deepseek' | 'gemini' | 'custom'
   apiKey?: string
   baseUrl?: string
   model?: string
@@ -113,6 +113,7 @@ function normalizeConfig(raw: any, fromEnv: { groupInfoList: GroupInfoItem[] }):
         env.DEEPSEEK_API_KEY ||
         env.OPENAI_API_KEY ||
         env.CLAUDE_API_KEY ||
+        env.GEMINI_API_KEY ||
         first.llm?.apiKey ||
         '',
       baseUrl: first.llm?.baseUrl || 'https://api.deepseek.com',
@@ -1087,7 +1088,7 @@ export async function filterAgentsWithBalance(
 }
 
 /**
- * Find account by username from root account.json（含人设字段，供 LLM 作为 config 使用）
+ * Find account by username from root account.json（含人设与 llm 配置，供 LLM 作为 config 使用）
  */
 export function findAccountByUsername(username: string): {
   mnemonic: string
@@ -1101,6 +1102,8 @@ export function findAccountByUsername(username: string): {
   stanceTendency?: string
   debateStyle?: string
   interactionStyle?: string
+  /** accountList 项中的 llm（可为数组，取 llm[0]） */
+  llm?: Array<{ provider?: string; apiKey?: string; baseUrl?: string; model?: string; temperature?: number; maxTokens?: number }> | { provider?: string; apiKey?: string; baseUrl?: string; model?: string; temperature?: number; maxTokens?: number }
 } | null {
   try {
     if (fs.existsSync(ACCOUNT_FILE)) {
@@ -1122,6 +1125,7 @@ export function findAccountByUsername(username: string): {
           stanceTendency: account.stanceTendency,
           debateStyle: account.debateStyle,
           interactionStyle: account.interactionStyle,
+          llm: account.llm,
         }
       }
     }

@@ -16,7 +16,7 @@ import {
   fetchAndUpdateGroupHistory,
 } from './utils'
 import { joinChannel } from './message'
-import { generateLLMResponse } from './llm'
+import { generateLLMResponse, getResolvedLLMConfig } from './llm'
 
 let createPin: any = null
 try {
@@ -38,18 +38,6 @@ const METAWEB_CONTEXT = `MetaWeb 白皮书核心要点：
 - 跨链互操作：数字资产与 NFT 跨链交互
 - DeFi 与 DPFi：支持数字资产与数字产品的去中心化金融
 - 核心理念：真正的去中心化需用户直接参与链网络，而非通过第三方中介`
-
-function getLLMConfig() {
-  const config = readConfig()
-  return {
-    provider: 'deepseek' as const,
-    apiKey: process.env.DEEPSEEK_API_KEY || config?.llm?.apiKey,
-    baseUrl: config?.llm?.baseUrl || 'https://api.deepseek.com',
-    model: 'deepseek-chat',
-    temperature: 0.8,
-    maxTokens: 300,
-  }
-}
 
 async function sendToGroup(name: string, content: string): Promise<boolean> {
   const account = findAccountByUsername(name)
@@ -111,9 +99,10 @@ async function main() {
   config.groupId = GROUP_ID
   readConfig()
 
-  const llmConfig = getLLMConfig()
+  const configForLlm = readConfig()
+  const llmConfig = getResolvedLLMConfig(undefined, configForLlm)
   if (!llmConfig.apiKey) {
-    console.error('❌ 请配置 DEEPSEEK_API_KEY 或 config.json llm.apiKey')
+    console.error('❌ 请配置 .env 中 LLM API Key 或 account.json/config.json llm')
     process.exit(1)
   }
 
