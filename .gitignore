@@ -10,6 +10,7 @@ MetaID-Agent/agent.md
 MetaID-Agent-Chat/node_modules/
 MetaID-Agent-Chat/agent.md
 MetaID-Agent-Chat/my_discussion.log
+MetaID-Agent-Chat/group_chat_listener.log
 
 
 projects/**/*
@@ -18,6 +19,7 @@ projects/**/*
 .group_chat_listener.pid
 .scenario_*.pid
 .group_listener_launch.sh
+group_chat_listener.log
 
 # 根目录下的敏感文件（account.json、.env、config.json、userInfo.json、group-list-history.log）
 account.json
