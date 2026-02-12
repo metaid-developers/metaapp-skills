@@ -1,7 +1,7 @@
 {
   "name": "metaid-agent-chat",
   "version": "1.0.0",
-  "description": "MetaBot-Chat skill for group chat management and messaging",
+  "description": "metabot-chat skill for group chat management and messaging",
   "main": "scripts/main.ts",
   "scripts": {
     "check-env": "bash scripts/check_environment.sh",

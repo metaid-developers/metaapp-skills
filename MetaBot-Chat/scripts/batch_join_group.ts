@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * Batch join all known users from MetaBot-Basic account.json to a specified group
+ * Batch join all known users from metabot-basic account.json to a specified group
  * Usage: npx ts-node scripts/batch_join_group.ts [groupId]
  */
 
@@ -10,17 +10,17 @@ import * as fs from 'fs'
 import { joinChannel } from './message'
 import { hasJoinedGroup, addGroupToUser } from './utils'
 
-// Import createPin from MetaBot-Basic skill
+// Import createPin from metabot-basic skill
 let createPin: any = null
 try {
-  const metaidAgentPath = path.join(__dirname, '..', '..', 'MetaBot-Basic', 'scripts', 'metaid')
+  const metaidAgentPath = path.join(__dirname, '..', '..', 'metabot-basic', 'scripts', 'metaid')
   const metaidModule = require(metaidAgentPath)
   createPin = metaidModule.createPin
   if (!createPin) {
-    throw new Error('createPin not found in MetaBot-Basic')
+    throw new Error('createPin not found in metabot-basic')
   }
 } catch (error) {
-  console.error('❌ Failed to load MetaBot-Basic skill:', error)
+  console.error('❌ Failed to load metabot-basic skill:', error)
   process.exit(1)
 }
 
@@ -40,7 +40,7 @@ interface Account {
 function getKnownAccounts(): Account[] {
   const accountFile = path.join(__dirname, '..', '..', 'account.json')
   if (!fs.existsSync(accountFile)) {
-    throw new Error('根目录 account.json 未找到，请先通过 MetaBot-Basic 创建 Agent')
+    throw new Error('根目录 account.json 未找到，请先通过 metabot-basic 创建 Agent')
   }
   const data = JSON.parse(fs.readFileSync(accountFile, 'utf-8'))
   return (data.accountList || [])

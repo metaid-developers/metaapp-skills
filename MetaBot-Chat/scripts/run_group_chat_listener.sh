@@ -1,6 +1,6 @@
 #!/bin/bash
 # 群聊监听启动脚本
-# 当用户说「开启群聊」「监听群聊」「让 XX Agent 监听群聊信息」等时，由 MetaBot-Chat skills 自动调用
+# 当用户说「开启群聊」「监听群聊」「让 XX Agent 监听群聊信息」等时，由 metabot-chat skills 自动调用
 # 默认在系统自带终端（Terminal.app）中启动监听，以保证网络权限、避免 fetch 失败
 #
 # 用法: ./run_group_chat_listener.sh [group_id] [agent_name] [log_file]

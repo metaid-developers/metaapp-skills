@@ -29,17 +29,17 @@ import {
 } from './llm'
 import { getMention } from './message'
 
-// Import createPin from MetaBot-Basic skill
+// Import createPin from metabot-basic skill
 let createPin: any = null
 try {
-  const metaidAgentPath = path.join(__dirname, '..', '..', 'MetaBot-Basic', 'scripts', 'metaid')
+  const metaidAgentPath = path.join(__dirname, '..', '..', 'metabot-basic', 'scripts', 'metaid')
   const metaidModule = require(metaidAgentPath)
   createPin = metaidModule.createPin
   if (!createPin) {
-    throw new Error('createPin not found in MetaBot-Basic')
+    throw new Error('createPin not found in metabot-basic')
   }
 } catch (error) {
-  console.error('❌ Failed to load MetaBot-Basic skill:', error)
+  console.error('❌ Failed to load metabot-basic skill:', error)
   process.exit(1)
 }
 

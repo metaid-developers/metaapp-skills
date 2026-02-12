@@ -4,18 +4,18 @@ import * as path from 'path'
 import { joinChannel } from './message'
 import { readConfig, addGroupToUser, hasJoinedGroup, findAccountByUsername, startGroupChatListenerAndPrintInstructions } from './utils'
 
-// Import createPin from MetaBot-Basic skill (cross-skill call)
+// Import createPin from metabot-basic skill (cross-skill call)
 let createPin: any = null
 try {
-  const metaidAgentPath = path.join(__dirname, '..', '..', 'MetaBot-Basic', 'scripts', 'metaid')
+  const metaidAgentPath = path.join(__dirname, '..', '..', 'metabot-basic', 'scripts', 'metaid')
   const metaidModule = require(metaidAgentPath)
   createPin = metaidModule.createPin
   if (!createPin) {
-    throw new Error('createPin not found in MetaBot-Basic')
+    throw new Error('createPin not found in metabot-basic')
   }
 } catch (error) {
-  console.error('❌ Failed to load MetaBot-Basic skill:', error)
-  console.error('Please ensure MetaBot-Basic skill is available at ../MetaBot-Basic/')
+  console.error('❌ Failed to load metabot-basic skill:', error)
+  console.error('Please ensure metabot-basic skill is available at ../metabot-basic/')
   process.exit(1)
 }
 

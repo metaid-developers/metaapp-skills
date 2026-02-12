@@ -1,11 +1,11 @@
 ---
-name: MetaBot-Basic
+name: metabot-basic
 description: Create and manage MetaID wallets and accounts. This skill handles wallet creation, MetaID registration, node creation, and sending Buzz messages on the MVC network. Use when users want to: (1) Create a new MetaBot (MetaID Agent)/robot/proxy with a wallet, (2) Register a MetaID account, (3) Create MetaID nodes, (4) Send Buzz messages to the MVC network. Requires Node.js >= 18.x.x and TypeScript. Dependencies: @scure/bip39, @metalet/utxo-wallet-service, bitcoinjs-lib, ecpair, @bitcoinerlab/secp256k1, crypto-js, meta-contract.
 ---
 
-# MetaBot-Basic
+# metabot-basic
 
-MetaBot-Basic skill provides comprehensive wallet and MetaID account management capabilities for the MVC network. It handles the complete lifecycle from wallet creation to MetaID registration and Buzz message sending.
+metabot-basic skill provides comprehensive wallet and MetaID account management capabilities for the MVC network. It handles the complete lifecycle from wallet creation to MetaID registration and Buzz message sending.
 
 ## Core Capabilities
 
@@ -44,7 +44,7 @@ npm install
 
 ## Workflow Overview
 
-The MetaBot-Basic workflow consists of three main phases:
+The metabot-basic workflow consists of three main phases:
 
 1. **Wallet Creation** - Generate mnemonic, derive addresses, save to `account.json` (project root)
 2. **MetaID Registration** - Claim gas subsidy, create MetaID node with username
@@ -123,12 +123,12 @@ Account data is stored in `account.json` at the **project root** (MetaApp-Skill/
 ```
 
 **Important Note**: 
-- Account file location: **project root** `account.json` (shared with MetaBot-Chat).
-- If `MetaBot-Basic/account.json` exists, it will be migrated to root on first run.
+- Account file location: **project root** `account.json` (shared with metabot-chat).
+- If `metabot-basic/account.json` exists, it will be migrated to root on first run.
 - Empty accounts (accounts with empty mnemonic) are automatically filtered out when writing.
 - **llm**：数组格式，`llm[0]` 默认从 `.env` / `.env.local` 读取；用户可手动添加 `llm[1]`、`llm[2]` 等；未指定时默认使用 `llm[0]`；旧格式（对象）会自动迁移为 `[llm]`。
 - **metaid**：创建 Agent 后调用 `getUserInfoByAddressByMs`，若返回 `metaId` 则同步到 account.json 和根目录 userInfo.json。
-- **avatarPinId**：若 `MetaBot-Basic/static/avatar` 下有图片文件（jpg/png/gif/webp/avif），创建 namePin 成功后自动创建 avatar pin 并写入。
+- **avatarPinId**：若 `metabot-basic/static/avatar` 下有图片文件（jpg/png/gif/webp/avif），创建 namePin 成功后自动创建 avatar pin 并写入。
 - **avatar**：格式为 `https://file.metaid.io/metafile-indexer/api/v1/files/accelerate/content/${avatarPinId}`，用于前端展示。
 - **chatPublicKey**：创建 Agent 时若 `userInfo.chatPublicKey` 为空则自动创建 `/info/chatpubkey` 节点；也可通过 `create_chatpubkey.ts` 为已有 Agent 单独创建。
 - **Agent 人设（character / preference / goal / masteringLanguages / stanceTendency / debateStyle / interactionStyle）**：在创建完 **name 节点** 时同时写入 `account.json` 的该账户下。若用户在提示词中指定（如「帮我生成一个 MetaID Agent，名字叫 Sam，性格 XXX，爱好 XXX，目标 XXX，擅长语言 XXX，立场 XXX，辩论风格 XXX，互动风格 XXX」），则按提示词填充；未指定则用系统默认策略 `getRandomItem` 分配。这些人设会在所有涉及 LLM 调用的场景中作为 config 传入（不限于群聊）。选项见 `utils.ts` 中的 `CHARACTER_OPTIONS`、`PREFERENCE_OPTIONS`、`GOAL_OPTIONS`、`LANGUAGE_OPTIONS`、`STANCE_OPTIONS`、`DEBATE_STYLE_OPTIONS`、`INTERACTION_STYLE_OPTIONS`。
@@ -164,7 +164,7 @@ All errors are logged to `log/error.md` with:
 
 ### 头像设置
 
-将图片文件（jpg/png/gif/webp/avif）放入 `MetaBot-Basic/static/avatar` 目录，执行 `create_agents.ts` 创建 Agent 时会自动创建 avatar pin 并写入 `avatarPinId`。
+将图片文件（jpg/png/gif/webp/avif）放入 `metabot-basic/static/avatar` 目录，执行 `create_agents.ts` 创建 Agent 时会自动创建 avatar pin 并写入 `avatarPinId`。
 
 **为已有 Agent 单独设置头像**：`npm run create-avatar -- "AI Eason"`（需先确保 `static/avatar` 下有图片）
 
@@ -230,7 +230,7 @@ npm run sync-agent-metaid -- "AI Eason"
 当用户在 Cursor 对话中提出需要**执行某条命令或脚本**的需求时（例如「让 AI Eason 监听群聊信息并且当监听到新消息之后对其进行回复」），**不应在输出推荐方案后结束任务**，而应：
 
 1. **先说明推荐方案**：简要说明已按需求接好的能力，以及推荐的一种或多种用法（如专用脚本、通用脚本等）。
-2. **继续代为执行推荐方案**：在给出命令示例后，**不要停止**，应通过 Cursor 的终端或执行能力，**直接帮用户把推荐方案执行起来**（例如执行 `cd MetaBot-Chat && ./scripts/run_ai_eason_listener.sh --no-open`）。
+2. **继续代为执行推荐方案**：在给出命令示例后，**不要停止**，应通过 Cursor 的终端或执行能力，**直接帮用户把推荐方案执行起来**（例如执行 `cd metabot-chat && ./scripts/run_ai_eason_listener.sh --no-open`）。
 3. **便于用户一键确认**：执行方式应设计为「用户可在对话中通过接受/确认（如点击接受、确认运行）即可完成执行」，相当于**一键替用户跑起来**，而不是仅把命令贴在对话框里让用户自己复制到终端执行。
 
 **原则**：当输出中包含「请执行以下命令」「在项目根目录下执行」「推荐方式如下」等让用户去跑某脚本的指引时，任务不应在此结束；应继续把该推荐命令实际执行起来，让用户只需在 Cursor 中确认/接受即可一键完成执行。

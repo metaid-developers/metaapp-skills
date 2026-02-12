@@ -1,6 +1,6 @@
 /**
- * Type definitions for MetaBot-Basic skill
- * These types are used for cross-skill calls to MetaBot-Basic
+ * Type definitions for metabot-basic skill
+ * These types are used for cross-skill calls to metabot-basic
  */
 
 export type Operation = 'init' | 'create' | 'modify' | 'revoke'

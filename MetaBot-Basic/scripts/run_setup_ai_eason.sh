@@ -1,6 +1,6 @@
 #!/bin/bash
 # 为 AI Eason 设置 MetaID 头像、创建 chatPubkey 节点、更新 metaid 信息
-# 使用前请确保 MetaBot-Basic/static/avatar 目录下有 无聊猿.avif
+# 使用前请确保 metabot-basic/static/avatar 目录下有 无聊猿.avif
 
 cd "$(dirname "$0")/.."
 

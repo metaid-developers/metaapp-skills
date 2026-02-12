@@ -1,6 +1,6 @@
 # Wallet Operations
 
-This document describes wallet creation and management operations for MetaBot-Basic.
+This document describes wallet creation and management operations for metabot-basic.
 
 ## Wallet Creation
 

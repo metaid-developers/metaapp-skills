@@ -464,7 +464,7 @@ export async function generateDiscussionMessage(
 
 /**
  * 根据最近30条群聊记录生成回复
- * - 若有人提及 MetaBot-Basic：重点回复该人
+ * - 若有人提及 metabot-basic：重点回复该人
  * - 若无提及：日常聊天，自然回复，不刻意展开话题
  */
 export async function generateChatReply(
@@ -477,7 +477,7 @@ export async function generateChatReply(
     masteringLanguages?: string[]
   },
   options: {
-    /** 是否有人提及 MetaBot-Basic，若有则重点回复提及者 */
+    /** 是否有人提及 metabot-basic，若有则重点回复提及者 */
     hasMetaIDAgentMention: boolean
     /** 提及者的姓名，用于 @ 回复 */
     mentionTargetName?: string
@@ -493,11 +493,11 @@ export async function generateChatReply(
   const goal = userProfile?.goal || ''
 
   const systemPrompt = options.hasMetaIDAgentMention
-    ? `你是"${agentName}"，在 🤖MetaBot 畅聊群中。有人提到了 MetaBot-Basic，请重点回复此人。
+    ? `你是"${agentName}"，在 🤖MetaBot 畅聊群中。有人提到了 metabot-basic，请重点回复此人。
 
 【人设】性格：${character}，兴趣：${preference || '广泛'}，目标：${goal || '参与交流'}
 
-【任务】针对"${options.mentionTargetName}"的发言（内容：${(options.mentionTargetContent || '').slice(0, 100)}...）进行回复。你可以介绍 MetaBot-Basic 相关能力、分享使用体验、或回答对方可能关心的问题。
+【任务】针对"${options.mentionTargetName}"的发言（内容：${(options.mentionTargetContent || '').slice(0, 100)}...）进行回复。你可以介绍 metabot-basic 相关能力、分享使用体验、或回答对方可能关心的问题。
 
 【重要】群内有 Agent 也有真人用户。不要只跟 Agent 互动，要主动与真人、非 Agent 用户交流。回复某人时在开头写 @对方名字，系统会通过 globalMetaId 正确 @ 提及。
 
@@ -533,7 +533,7 @@ ${options.discussionTopic ? `\n【当前讨论话题】大家正在自由讨论�
   } catch (error: any) {
     console.error(`⚠️  generateChatReply 失败: ${error.message}`)
     const fallback = options.hasMetaIDAgentMention
-      ? `@${options.mentionTargetName} 感谢提到 MetaBot-Basic！有什么想了解的可以问我～`
+      ? `@${options.mentionTargetName} 感谢提到 metabot-basic！有什么想了解的可以问我～`
       : '嗯，大家聊得挺有意思的～'
     return { content: fallback, mentionName: options.mentionTargetName }
   }

@@ -623,7 +623,7 @@ export function processAndWriteMessages(
 
 /**
  * 拉取最新消息并写入 group-list-history.log（按 SKILL.md 策略）
- * 每次 MetaBot-Basic 发言前必须调用此函数
+ * 每次 metabot-basic 发言前必须调用此函数
  *
  * API 语义：startIndex 为起始 index（含），返回 [startIndex, startIndex+size-1]
  * - 使用 startIndex = grouplastIndex + 1 拉取新消息，避免重复拉取
@@ -911,7 +911,7 @@ export function shouldParticipate(user: UserInfo, baseProbability: number = 0.3)
 }
 
 /**
- * Get user info from MetaBot-Basic account.json
+ * Get user info from metabot-basic account.json
  */
 export function getMetaIDAgentAccount(mvcAddress: string): {
   mnemonic: string
@@ -933,13 +933,13 @@ export function getMetaIDAgentAccount(mvcAddress: string): {
       }
     }
   } catch (error) {
-    console.error('Error reading MetaBot-Basic account.json:', error)
+    console.error('Error reading metabot-basic account.json:', error)
   }
   return null
 }
 
 /**
- * Get all MetaBot-Basic names that have joined the given group
+ * Get all metabot-basic names that have joined the given group
  * 优先从 userInfo 读取，若无则从 account.json 读取并过滤已加群的
  */
 export function getAgentsInGroup(groupId: string): string[] {
@@ -977,7 +977,7 @@ export function stripLeadingSelfMention(content: string, selfName: string): stri
   return out || content
 }
 
-/** 检测消息中是否 @提及 了某 MetaBot-Basic，返回被提及的 Agent 名（取最近一条） */
+/** 检测消息中是否 @提及 了某 metabot-basic，返回被提及的 Agent 名（取最近一条） */
 export function findMentionedAgent(
   entries: { content: string; userInfo?: { name?: string } }[],
   agentNames: string[]
@@ -1051,7 +1051,7 @@ export function getGoodnightMessage(_agentName?: string): string {
  */
 export async function getMvcBalanceSafe(address: string): Promise<number | null> {
   try {
-    const api = require(path.join(__dirname, '..', '..', 'MetaBot-Basic', 'scripts', 'api'))
+    const api = require(path.join(__dirname, '..', '..', 'metabot-basic', 'scripts', 'api'))
     if (typeof api.getMvcBalance !== 'function') return null
     return await api.getMvcBalance(address)
   } catch {

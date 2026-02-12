@@ -2,7 +2,7 @@
 
 /**
  * 统一群聊监听脚本
- * 整合 MetaBot-Chat 主要业务逻辑：
+ * 整合 metabot-chat 主要业务逻辑：
  * - 群聊消息拉取与解密
  * - 群聊记录读写（group-list-history.log）
  * - 群聊信息读写（config.json grouplastIndex）
@@ -31,7 +31,7 @@ import * as path from 'path'
 
 let createPin: any = null
 try {
-  const metaidModule = require(path.join(__dirname, '..', '..', 'MetaBot-Basic', 'scripts', 'metaid'))
+  const metaidModule = require(path.join(__dirname, '..', '..', 'metabot-basic', 'scripts', 'metaid'))
   createPin = metaidModule.createPin
 } catch {
   createPin = null

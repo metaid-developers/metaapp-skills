@@ -1,5 +1,5 @@
 #!/bin/bash
-# Environment check script for MetaBot-Basic
+# Environment check script for metabot-basic
 # Verifies Node.js >= 18.x.x and TypeScript installation
 
 set -e

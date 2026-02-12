@@ -3,7 +3,7 @@
 /**
  * 🤖MetaBot 畅聊群 智能回复
  * 根据最近30条群聊记录：
- * - 若有人提及 MetaBot-Basic → 重点回复该人
+ * - 若有人提及 metabot-basic → 重点回复该人
  * - 若无提及 → 日常聊天，自然回复，不刻意展开话题
  */
 
@@ -34,23 +34,23 @@ import { joinChannel } from './message'
 
 let createPin: any = null
 try {
-  const metaidModule = require(path.join(__dirname, '..', '..', 'MetaBot-Basic', 'scripts', 'metaid'))
+  const metaidModule = require(path.join(__dirname, '..', '..', 'metabot-basic', 'scripts', 'metaid'))
   createPin = metaidModule.createPin
 } catch (error) {
-  console.error('❌ Failed to load MetaBot-Basic:', error)
+  console.error('❌ Failed to load metabot-basic:', error)
   process.exit(1)
 }
 
 /** 默认群 ID，优先使用 readConfig().groupId */
 const DEFAULT_GROUP_ID = 'c1d5c0c7c4430283b3155b25d59d98ba95b941d9bfc3542bf89ba56952058f85i0'
-const METABOT_BASIC_KEYWORDS = ['MetaBot-Basic', 'MetaBot', 'metabot-basic', 'MetaBotBasic']
+const METABOT_BASIC_KEYWORDS = ['metabot-basic', 'MetaBot', 'metabot-basic', 'MetaBotBasic']
 
 function containsMetaIDAgent(text: string): boolean {
   const lower = (text || '').toLowerCase()
   return METABOT_BASIC_KEYWORDS.some((k) => lower.includes(k.toLowerCase()))
 }
 
-/** 检测消息中是否 @提及 了某 MetaBot-Basic，返回被提及的 Agent 名（取最近一条） */
+/** 检测消息中是否 @提及 了某 metabot-basic，返回被提及的 Agent 名（取最近一条） */
 function findMentionedAgent(entries: { content: string; userInfo?: { name?: string } }[], agentNames: string[]): string | null {
   for (let i = entries.length - 1; i >= 0; i--) {
     const content = (entries[i].content || '').trim()

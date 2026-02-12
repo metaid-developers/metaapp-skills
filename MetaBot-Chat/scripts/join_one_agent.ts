@@ -11,10 +11,10 @@ import { readConfig, addGroupToUser, hasJoinedGroup, findAccountByUsername } fro
 
 let createPin: any = null
 try {
-  const metaidModule = require(path.join(__dirname, '..', '..', 'MetaBot-Basic', 'scripts', 'metaid'))
+  const metaidModule = require(path.join(__dirname, '..', '..', 'metabot-basic', 'scripts', 'metaid'))
   createPin = metaidModule.createPin
 } catch (e) {
-  console.error('❌ MetaBot-Basic 未找到')
+  console.error('❌ metabot-basic 未找到')
   process.exit(1)
 }
 

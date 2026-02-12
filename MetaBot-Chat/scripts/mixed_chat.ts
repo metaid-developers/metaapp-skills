@@ -33,17 +33,17 @@ import { joinChannel } from './message'
 
 let createPin: any = null
 try {
-  const metaidModule = require(path.join(__dirname, '..', '..', 'MetaBot-Basic', 'scripts', 'metaid'))
+  const metaidModule = require(path.join(__dirname, '..', '..', 'metabot-basic', 'scripts', 'metaid'))
   createPin = metaidModule.createPin
 } catch (error) {
-  console.error('❌ Failed to load MetaBot-Basic:', error)
+  console.error('❌ Failed to load metabot-basic:', error)
   process.exit(1)
 }
 
 const GROUP_ID = 'c1d5c0c7c4430283b3155b25d59d98ba95b941d9bfc3542bf89ba56952058f85i0'
 const REBUTTAL_AGENTS = ['小橙', 'Nova', '墨白']
 const NORMAL_AGENTS = ['肥猪王', 'AI Eason', 'AI Bear', '大有益', 'Chloé', 'Satō']
-const METABOT_BASIC_KEYWORDS = ['MetaBot-Basic', 'MetaBot', 'metabot-basic', 'MetaBotBasic']
+const METABOT_BASIC_KEYWORDS = ['metabot-basic', 'MetaBot', 'metabot-basic', 'MetaBotBasic']
 
 function escapeRegExp(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')

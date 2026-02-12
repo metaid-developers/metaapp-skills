@@ -27,8 +27,8 @@ case "$SCENARIO" in
   topic_pair_chat_poll)
     if [ -f "scripts/topic_pair_chat_poll.ts" ]; then
       CMD="npx ts-node scripts/topic_pair_chat_poll.ts"
-    elif [ -f "../projects/MetaBot-Chat/scripts/topic_pair_chat_poll.ts" ]; then
-      CMD="npx ts-node ../projects/MetaBot-Chat/scripts/topic_pair_chat_poll.ts"
+    elif [ -f "../projects/metabot-chat/scripts/topic_pair_chat_poll.ts" ]; then
+      CMD="npx ts-node ../projects/metabot-chat/scripts/topic_pair_chat_poll.ts"
     else
       CMD="npx ts-node scripts/chat_poll_scheduler.ts"
       echo "⚠️ topic_pair_chat_poll 脚本未找到，回退到 chat_poll_scheduler"

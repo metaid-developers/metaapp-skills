@@ -18,7 +18,7 @@ export function getAvatarUrl(avatarPinId: string): string {
   return `${AVATAR_URL_BASE}/${avatarPinId}`
 }
 
-/** Agent 人设选项（与 MetaBot-Chat addGroupToUser 一致，创建 name 节点时写入 account.json） */
+/** Agent 人设选项（与 metabot-chat addGroupToUser 一致，创建 name 节点时写入 account.json） */
 export const CHARACTER_OPTIONS = [
   '幽默风趣', '严肃认真', '活泼开朗', '内向沉稳', '热情奔放',
   '理性冷静', '感性细腻', '乐观积极', '谨慎保守', '创新大胆',
@@ -153,7 +153,7 @@ export function applyProfileToAccount(
     overrides?.interactionStyle || account.interactionStyle || getRandomItem(INTERACTION_STYLE_OPTIONS)
 }
 
-// 根目录下的 account.json（与 MetaBot-Chat 共享）
+// 根目录下的 account.json（与 metabot-chat 共享）
 const ROOT_DIR = path.join(__dirname, '..', '..')
 const ACCOUNT_FILE = path.join(ROOT_DIR, 'account.json')
 const OLD_ACCOUNT_FILE = path.join(__dirname, '..', 'account.json')
@@ -208,7 +208,7 @@ export function writeAccountFile(data: AccountData): void {
 
 // Create account.json from template if it doesn't exist
 export function ensureAccountFile(): void {
-  // 迁移：若旧位置 MetaBot-Basic/account.json 存在且根目录不存在，则复制到根目录
+  // 迁移：若旧位置 metabot-basic/account.json 存在且根目录不存在，则复制到根目录
   if (fs.existsSync(OLD_ACCOUNT_FILE) && !fs.existsSync(ACCOUNT_FILE)) {
     try {
       fs.copyFileSync(OLD_ACCOUNT_FILE, ACCOUNT_FILE)
@@ -230,7 +230,7 @@ export function ensureAccountFile(): void {
   }
 }
 
-// 根目录 userInfo.json（与 MetaBot-Chat 共享）
+// 根目录 userInfo.json（与 metabot-chat 共享）
 const USER_INFO_FILE = path.join(ROOT_DIR, 'userInfo.json')
 
 export interface UserInfoItem {

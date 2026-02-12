@@ -2,7 +2,7 @@
 
 /**
  * 头像处理模块 - Node.js 环境
- * 从 MetaBot-Basic/static/avatar 读取图片，转为 base64 供链上创建
+ * 从 metabot-basic/static/avatar 读取图片，转为 base64 供链上创建
  */
 
 import * as fs from 'fs'

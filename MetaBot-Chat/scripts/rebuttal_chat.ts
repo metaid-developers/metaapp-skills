@@ -30,10 +30,10 @@ import { joinChannel } from './message'
 
 let createPin: any = null
 try {
-  const metaidModule = require(path.join(__dirname, '..', '..', 'MetaBot-Basic', 'scripts', 'metaid'))
+  const metaidModule = require(path.join(__dirname, '..', '..', 'metabot-basic', 'scripts', 'metaid'))
   createPin = metaidModule.createPin
 } catch (error) {
-  console.error('❌ Failed to load MetaBot-Basic:', error)
+  console.error('❌ Failed to load metabot-basic:', error)
   process.exit(1)
 }
 

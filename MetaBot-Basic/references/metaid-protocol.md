@@ -218,7 +218,7 @@ All errors are logged to `log/error.md` with context and stack traces.
 
 ## Generic `createPin` Usage
 
-The MetaBot-Basic skill exposes a generic `createPin` API that can be used to create or modify any MetaID protocol node as long as the payload conforms to the MetaID schema.
+The metabot-basic skill exposes a generic `createPin` API that can be used to create or modify any MetaID protocol node as long as the payload conforms to the MetaID schema.
 
 ```typescript
 import { createPin, CreatePinParams, MetaidData } from './metaid'

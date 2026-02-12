@@ -3,14 +3,14 @@
 
 
 
-# MetaBot-Basic / MetaBot-Chat
-/MetaBot-Basic/log/
-/MetaBot-Basic/node_modules/
-/MetaBot-Basic/agent.md
-/MetaBot-Chat/node_modules/
-/MetaBot-Chat/agent.md
-/MetaBot-Chat/my_discussion.log
-/MetaBot-Chat/group_chat_listener.log
+# metabot-basic / metabot-chat
+/metabot-basic/log/
+/metabot-basic/node_modules/
+/metabot-basic/agent.md
+/metabot-chat/node_modules/
+/metabot-chat/agent.md
+/metabot-chat/my_discussion.log
+/metabot-chat/group_chat_listener.log
 
 
 projects/**/*

@@ -1,7 +1,7 @@
 {
   "name": "metabot-basic",
   "version": "1.0.0",
-  "description": "MetaBot-Basic skill for wallet and MetaID management",
+  "description": "metabot-basic skill for wallet and MetaID management",
   "main": "scripts/main.ts",
   "scripts": {
     "check-env": "bash scripts/check_environment.sh",

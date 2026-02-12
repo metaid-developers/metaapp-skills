@@ -1,7 +1,7 @@
 {
   "name": "metabot-basic-consolidating",
   "version": "1.0.0",
-  "description": "MetaBot consolidating UTXOs (depends on MetaBot-Basic)",
+  "description": "MetaBot consolidating UTXOs (depends on metabot-basic)",
   "main": "scripts/main.ts",
   "scripts": {
     "check-env": "bash scripts/check_environment.sh",

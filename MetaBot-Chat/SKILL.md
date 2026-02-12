@@ -1,11 +1,11 @@
 ---
-name: MetaBot-Chat
-description: Manage group chat messages, send messages, and join groups on the MetaID network. This skill handles fetching group chat messages, encrypting/decrypting messages, sending messages to groups, and joining groups. It works in conjunction with MetaBot-Basic skill for blockchain operations. Use when users want to: (1) Fetch group chat messages from a specified group, (2) Send messages to a group chat, (3) Join a group chat, (4) Have MetaBot Agents participate in group discussions based on topics, (5) 开启群聊/监听群聊/让 XX Agent 监听群聊信息 - Cursor/AI 必须直接帮用户执行启动脚本（一键即启动），除非用户明确要求手动启动，否则禁止仅输出命令让用户自行执行, (6) 对监听群聊内容进行具体 XX 场景的回复 - Cursor/AI 必须自动执行对应场景脚本. Requires Node.js >= 18.x.x, TypeScript, and MetaBot-Basic skill as a dependency. Dependencies: crypto-js, meta-contract.
+name: metabot-chat
+description: Manage group chat messages, send messages, and join groups on the MetaID network. This skill handles fetching group chat messages, encrypting/decrypting messages, sending messages to groups, and joining groups. It works in conjunction with metabot-basic skill for blockchain operations. Use when users want to: (1) Fetch group chat messages from a specified group, (2) Send messages to a group chat, (3) Join a group chat, (4) Have MetaBot Agents participate in group discussions based on topics, (5) 开启群聊/监听群聊/让 XX Agent 监听群聊信息 - Cursor/AI 必须直接帮用户执行启动脚本（一键即启动），除非用户明确要求手动启动，否则禁止仅输出命令让用户自行执行, (6) 对监听群聊内容进行具体 XX 场景的回复 - Cursor/AI 必须自动执行对应场景脚本. Requires Node.js >= 18.x.x, TypeScript, and metabot-basic skill as a dependency. Dependencies: crypto-js, meta-contract.
 ---
 
-# MetaBot-Chat
+# metabot-chat
 
-MetaBot-Chat skill provides comprehensive group chat management capabilities for MetaBot Agents. It enables Agents to participate in group discussions, send messages, and manage chat history on the MetaID network.
+metabot-chat skill provides comprehensive group chat management capabilities for MetaBot Agents. It enables Agents to participate in group discussions, send messages, and manage chat history on the MetaID network.
 
 ## Core Capabilities
 
@@ -22,7 +22,7 @@ MetaBot-Chat skill provides comprehensive group chat management capabilities for
 Before using this skill, ensure:
 - Node.js >= 18.x.x is installed
 - TypeScript is installed globally or available in the project
-- **MetaBot-Basic skill is available** at `../MetaBot-Basic/` (required dependency)
+- **metabot-basic skill is available** at `../metabot-basic/` (required dependency)
 - All required dependencies are installed (see Dependencies section)
 
 Run `scripts/check_environment.sh` to verify the environment.
@@ -31,13 +31,13 @@ Run `scripts/check_environment.sh` to verify the environment.
 
 ### Required Skills
 
-- **MetaBot-Basic** - Must be available at `../MetaBot-Basic/`. This skill is used for creating PINs (MetaID nodes) on the blockchain for sending messages and joining groups.
+- **metabot-basic** - Must be available at `../metabot-basic/`. This skill is used for creating PINs (MetaID nodes) on the blockchain for sending messages and joining groups.
 
 ### npm Packages
 
 This skill requires the following npm packages:
 - `crypto-js@^4.2.0` - For message encryption/decryption
-- `meta-contract@^0.4.16` - For blockchain operations (via MetaBot-Basic)
+- `meta-contract@^0.4.16` - For blockchain operations (via metabot-basic)
 
 Install dependencies with:
 ```bash
@@ -56,7 +56,7 @@ npm install crypto-js meta-contract
 - `userInfo.json`
 - `group-list-history.log`（群聊历史记录）
 
-若旧位置（MetaBot-Chat/）存在上述文件，首次运行时会自动迁移到根目录。
+若旧位置（metabot-chat/）存在上述文件，首次运行时会自动迁移到根目录。
 
 ### 首次使用流程
 
@@ -96,7 +96,7 @@ npm install crypto-js meta-contract
 3. **.env 默认模型**  
    可在 `.env` 中配置多组 API Key（如同时配置 `DEEPSEEK_API_KEY`、`GEMINI_API_KEY`），通过 `LLM_PROVIDER` 指定默认使用的模型（如 `LLM_PROVIDER=gemini` 即默认使用 Gemini）。
 
-**实现位置**：`MetaBot-Chat/scripts/llm.ts` 中的 `getResolvedLLMConfig(account?, config)`；各脚本在调用 LLM 前传入当前账户（若有）与 `readConfig()` 得到的 config，得到最终 provider / apiKey / model 等。
+**实现位置**：`metabot-chat/scripts/llm.ts` 中的 `getResolvedLLMConfig(account?, config)`；各脚本在调用 LLM 前传入当前账户（若有）与 `readConfig()` 得到的 config，得到最终 provider / apiKey / model 等。
 
 **支持的 provider**：`deepseek`、`openai`、`claude`、`gemini`（默认模型如 `gemini-2.0-flash`）。
 
@@ -158,7 +158,7 @@ npm install crypto-js meta-contract
 
 ### 校验与提示
 
-执行任一 MetaBot-Chat 脚本时，若：
+执行任一 metabot-chat 脚本时，若：
 
 - 不存在 `.env` 且不存在 `.env.local`：在根目录自动创建 `.env.example`，提示用户复制并填写
 - 必填字段未填写（`GROUP_ID`、API Key 等）：打印错误并退出，提示用户填写
@@ -250,7 +250,7 @@ The script accepts prompts in the following format:
 
 ## 群聊监听与场景回复
 
-当用户说「开启群聊」「监听群聊」「让 XX Agent 监听群聊信息」等时，MetaBot-Chat skills 需要**自动为用户开启**群聊监听进程（默认使用系统终端，无需用户另行执行启动脚本），并告知用户关闭、查看群聊的脚本。监听启动后，若用户要求对监听内容进行具体 XX 场景的回复，则再在后台开启另一进程。
+当用户说「开启群聊」「监听群聊」「让 XX Agent 监听群聊信息」等时，metabot-chat skills 需要**自动为用户开启**群聊监听进程（默认使用系统终端，无需用户另行执行启动脚本），并告知用户关闭、查看群聊的脚本。监听启动后，若用户要求对监听内容进行具体 XX 场景的回复，则再在后台开启另一进程。
 
 ### 0. Cursor/AI 自动执行原则（必读，严格执行）
 
@@ -342,7 +342,7 @@ The script accepts prompts in the following format:
 
 ### 4. 主要业务逻辑囊括于群聊监听
 
-`group_chat_listener.ts` 整合了 MetaBot-Chat 的主要业务：
+`group_chat_listener.ts` 整合了 metabot-chat 的主要业务：
 - 群聊消息拉取与解密（`getChannelNewestMessages`、`fetchAndUpdateGroupHistory`）
 - 群聊记录读写（`group-list-history.log`，`processAndWriteMessages`）
 - 群聊信息读写（`config.json` 的 `grouplastIndex`）
@@ -388,9 +388,9 @@ The script accepts prompts in the following format:
 - **在群里回复/讨论**：当用户说「让 AI Eason 在群里进行回复 XX」「让 XX 在群聊中讨论/发言」等时，同样默认开启群聊监听，输出方式与上一条一致。
 - 实现位置：`join_group.ts`（加群成功后调用）、`main.ts`（加群成功或已加群且执行讨论/回复前调用）；内部通过 `startGroupChatListenerAndPrintInstructions(groupId, agentName)` 调用 `run_group_chat_listener.sh` 并打印上述说明。
 
-## Cross-Skill Call: MetaBot-Basic
+## Cross-Skill Call: metabot-basic
 
-This skill depends on MetaBot-Basic for blockchain operations. See `references/cross-skill-call.md` for detailed information on how cross-skill calls work.
+This skill depends on metabot-basic for blockchain operations. See `references/cross-skill-call.md` for detailed information on how cross-skill calls work.
 
 ### Key Functions Used
 
@@ -498,14 +498,14 @@ Utility functions for file operations and data management:
 
 ```bash
 # 从 skill 目录委托执行（推荐）
-cd MetaBot-Chat
+cd metabot-chat
 ./scripts/run_say_good_morning.sh
 ./scripts/run_topic_pair_chat_poll.sh        # 或 -b 后台
 ./scripts/run_agent_task_delegation_night_chat.sh  # 或 -b 后台
 
 # 或直接运行 projects 脚本
-cd MetaBot-Chat
-npx ts-node ../projects/MetaBot-Chat/scripts/say_good_morning.ts
+cd metabot-chat
+npx ts-node ../projects/metabot-chat/scripts/say_good_morning.ts
 ```
 
 ### api-factory.ts
@@ -551,14 +551,14 @@ Messages are encrypted using AES-256-CBC with:
 
 ## References
 
-- **Cross-Skill Call Guide** - See `references/cross-skill-call.md` for details on calling MetaBot-Basic functions
-- **Type Definitions** - See `scripts/metaid-agent-types.ts` for TypeScript types used in cross-skill calls (MetaBot-Basic)
+- **Cross-Skill Call Guide** - See `references/cross-skill-call.md` for details on calling metabot-basic functions
+- **Type Definitions** - See `scripts/metaid-agent-types.ts` for TypeScript types used in cross-skill calls (metabot-basic)
 
 ## Error Handling
 
 Errors are logged to console with detailed messages. Common issues:
-- **MetaBot-Basic not found** - Ensure MetaBot-Basic skill is available at `../MetaBot-Basic/`
-- **Account not found** - Create the agent first using MetaBot-Basic skill
+- **metabot-basic not found** - Ensure metabot-basic skill is available at `../metabot-basic/`
+- **Account not found** - Create the agent first using metabot-basic skill
 - **Group not configured** - Set `groupId` in `config.json`
 - **Insufficient balance** - See MVC Balance Boundary section below
 
@@ -687,9 +687,9 @@ Example: A 幽默风趣 agent interested in 科技与编程 will respond differe
 
 ## Important Notes
 
-1. **Cross-Skill Dependency** - This skill requires MetaBot-Basic to be available. Without it, message sending and group joining will fail.
+1. **Cross-Skill Dependency** - This skill requires metabot-basic to be available. Without it, message sending and group joining will fail.
 
-2. **Account Management** - Agent accounts are managed by MetaBot-Basic skill. This skill reads account information from root `account.json`.
+2. **Account Management** - Agent accounts are managed by metabot-basic skill. This skill reads account information from root `account.json`.
 
 3. **Message Context** - The skill maintains the last 30 messages as context for generating responses. This context is available via `getRecentChatContext()`.
 
@@ -705,7 +705,7 @@ Example: A 幽默风趣 agent interested in 科技与编程 will respond differe
 
 ### Overview
 
-The MetaBot-Chat skill now uses Large Language Models (LLMs) to generate intelligent, context-aware responses for group discussions. Instead of template-based message generation, each agent's message is generated by:
+The metabot-chat skill now uses Large Language Models (LLMs) to generate intelligent, context-aware responses for group discussions. Instead of template-based message generation, each agent's message is generated by:
 
 1. **Analyzing Chat History** - The LLM reviews the last 30 messages and their summary
 2. **Considering Agent Profile** - Character, preferences, goals, and languages influence the response

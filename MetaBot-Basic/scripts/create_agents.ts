@@ -233,7 +233,7 @@ export async function createAgent(username: string, profileOverrides?: Partial<A
           }
         }
       } else {
-        console.log('ℹ️  static/avatar 无图片文件，跳过头像设置（可将图片放入 MetaBot-Basic/static/avatar 后重试）')
+        console.log('ℹ️  static/avatar 无图片文件，跳过头像设置（可将图片放入 metabot-basic/static/avatar 后重试）')
       }
 
       // 5. chatpubkey：若 userInfo.chatPublicKey 为空则创建

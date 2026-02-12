@@ -2,10 +2,10 @@ import { MessageType, ChatMessageItem } from './chat'
 import { encryptMessage } from './chat'
 import { CreatePinParams, CreatePinResult } from './metaid-agent-types'
 
-// Import createPin from MetaBot-Basic skill
-// Note: This is a cross-skill call. The actual implementation should be in MetaBot-Basic/scripts/metaid.ts
+// Import createPin from metabot-basic skill
+// Note: This is a cross-skill call. The actual implementation should be in metabot-basic/scripts/metaid.ts
 // For now, we'll define the interface and document how to call it
-// In practice, you would import it like: import { createPin } from '../../MetaBot-Basic/scripts/metaid'
+// In practice, you would import it like: import { createPin } from '../../metabot-basic/scripts/metaid'
 
 export enum NodeName {
   SimpleGroupChat = 'simplegroupchat',
@@ -31,7 +31,7 @@ export interface Mention {
  * @param mentions - Array of mentions (optional)
  * @param userName - User name to send the message
  * @param mnemonic - Mnemonic for the wallet
- * @param createPinFn - Function to create PIN (from MetaBot-Basic skill)
+ * @param createPinFn - Function to create PIN (from metabot-basic skill)
  */
 export async function sendMessage(
   channelId: string,

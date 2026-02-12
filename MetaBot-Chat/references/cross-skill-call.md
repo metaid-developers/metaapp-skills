@@ -1,25 +1,25 @@
-# Cross-Skill Call: MetaBot-Basic
+# Cross-Skill Call: metabot-basic
 
-MetaBot-Chat skill depends on MetaBot-Basic skill for creating PINs (MetaID nodes) on the blockchain.
+metabot-chat skill depends on metabot-basic skill for creating PINs (MetaID nodes) on the blockchain.
 
 ## Required Dependency
 
-**MetaBot-Basic skill** must be available in the workspace at:
+**metabot-basic skill** must be available in the workspace at:
 ```
-../MetaBot-Basic/
+../metabot-basic/
 ```
 
-## How to Call MetaBot-Basic Functions
+## How to Call metabot-basic Functions
 
 ### Import createPin Function
 
-The `createPin` function from MetaBot-Basic is used to create MetaID nodes for:
+The `createPin` function from metabot-basic is used to create MetaID nodes for:
 - Sending group chat messages
 - Joining groups
 
 **Import path:**
 ```typescript
-import { createPin } from '../../MetaBot-Basic/scripts/metaid'
+import { createPin } from '../../metabot-basic/scripts/metaid'
 ```
 
 **Function signature:**
@@ -33,7 +33,7 @@ async function createPin(
 ### Usage Example
 
 ```typescript
-import { createPin } from '../../MetaBot-Basic/scripts/metaid'
+import { createPin } from '../../metabot-basic/scripts/metaid'
 import { CreatePinParams } from '../scripts/metaid-agent-types'
 
 const params: CreatePinParams = {
@@ -58,7 +58,7 @@ const result = await createPin(params, mnemonic)
 
 ## Required Account Information
 
-MetaBot-Chat needs to access account information from root `account.json` to:
+metabot-chat needs to access account information from root `account.json` to:
 - Get mnemonic for wallet operations
 - Get userName for sending messages
 - Get globalMetaId for mentions
@@ -87,7 +87,7 @@ MetaBot-Chat needs to access account information from root `account.json` to:
 
 ## Error Handling
 
-If MetaBot-Basic skill is not available or `createPin` fails:
+If metabot-basic skill is not available or `createPin` fails:
 - The error will be propagated to the caller
-- Check that MetaBot-Basic is properly installed and configured
+- Check that metabot-basic is properly installed and configured
 - Ensure the account has sufficient balance for transaction fees

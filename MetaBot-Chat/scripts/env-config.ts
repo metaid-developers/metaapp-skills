@@ -73,7 +73,7 @@ function loadEnv(): Record<string, string> {
  * 创建 .env.example 模板（支持多模型：deepseek / openai / claude / gemini，由 LLM_PROVIDER 指定默认）
  */
 function createEnvExample(): void {
-  const content = `# MetaBot-Chat configuration
+  const content = `# metabot-chat configuration
 # 复制此文件为 .env 或 .env.local，然后填写实际值
 
 # 群聊配置
@@ -227,12 +227,12 @@ function validateAndExit(env: Record<string, string>): void {
     console.error('\n❌ 配置校验失败，请填写以下必填项后再执行：\n')
     errors.forEach((e) => console.error('   • ' + e))
     console.error('\n   请复制 .env.example 为 .env 或 .env.local，并填写实际值。')
-    console.error('   参考: MetaBot-Chat/SKILL.md 中的「配置与敏感文件」章节\n')
+    console.error('   参考: metabot-chat/SKILL.md 中的「配置与敏感文件」章节\n')
     process.exit(1)
   }
 }
 
-/** 旧路径：MetaBot-Chat 目录下 */
+/** 旧路径：metabot-chat 目录下 */
 const OLD_METAID_CHAT_DIR = path.join(__dirname, '..')
 const OLD_ENV_FILE = path.join(OLD_METAID_CHAT_DIR, '.env')
 const OLD_ENV_LOCAL_FILE = path.join(OLD_METAID_CHAT_DIR, '.env.local')
@@ -280,7 +280,7 @@ export function ensureConfigFiles(): void {
     console.error('   已自动创建根目录 .env.example，请复制为 .env 或 .env.local 后填写配置：')
     console.error('   cp .env.example .env')
     console.error('\n   必填项：GROUP_ID、LLM_API_KEY（或 DEEPSEEK_API_KEY 等）')
-    console.error('   参考: MetaBot-Chat/SKILL.md（配置文件位于项目根目录）\n')
+    console.error('   参考: metabot-chat/SKILL.md（配置文件位于项目根目录）\n')
     process.exit(1)
   }
 

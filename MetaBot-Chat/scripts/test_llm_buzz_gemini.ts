@@ -83,15 +83,15 @@ async function main() {
     process.exit(1)
   }
 
-  console.log('\n📋 【3】使用 MetaBot-Basic 发送 Buzz（内容为上一步 LLM 输出）')
+  console.log('\n📋 【3】使用 metabot-basic 发送 Buzz（内容为上一步 LLM 输出）')
   let createBuzz: (mnemonic: string, content: string, feeRate: number, opts?: { addressIndex?: number }) => Promise<{ txids: string[]; totalCost: number }>
   let parseAddressIndexFromPath: (path: string) => number
   try {
-    const metaidPath = path.join(__dirname, '..', '..', 'MetaBot-Basic', 'scripts')
+    const metaidPath = path.join(__dirname, '..', '..', 'metabot-basic', 'scripts')
     createBuzz = (await import(path.join(metaidPath, 'buzz'))).createBuzz
     parseAddressIndexFromPath = (await import(path.join(metaidPath, 'wallet'))).parseAddressIndexFromPath
   } catch (e) {
-    console.error('❌ 无法加载 MetaBot-Basic (buzz/wallet)，请确保 MetaBot-Basic 在 ../MetaBot-Basic')
+    console.error('❌ 无法加载 metabot-basic (buzz/wallet)，请确保 metabot-basic 在 ../metabot-basic')
     process.exit(1)
   }
 
